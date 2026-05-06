@@ -70,6 +70,7 @@ export type RecommendationPayload = {
   user_profile: UserProfile;
   candidate_items: string[];
   context?: string;
+  conversation_history?: string[];
   top_k: number;
   recommender_personality?: "analyst" | "coach" | "friend" | "nigerian_twitter";
   conversational_mode?: boolean;
