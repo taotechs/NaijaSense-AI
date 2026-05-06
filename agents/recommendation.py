@@ -15,6 +15,8 @@ class RecommendationAgent(BaseAgent):
         candidate_items: List[str] = payload["candidate_items"]
         memory_hits: List[str] = payload.get("memory_hits", [])
         top_k = payload["top_k"]
+        recommender_personality = payload.get("recommender_personality", "analyst")
+        conversational_mode = bool(payload.get("conversational_mode", True))
 
         interests = [i.lower() for i in user_model.get("interests", [])]
         bias_bonus = 0.1 if user_model.get("bias") == "positive" else 0.0
@@ -36,5 +38,35 @@ class RecommendationAgent(BaseAgent):
             )
 
         scored.sort(key=lambda x: x["score"], reverse=True)
-        return {"recommendations": scored[:top_k]}
+        top_recommendations = scored[:top_k]
+        explainability = {
+            "personality_selected": recommender_personality,
+            "scoring_formula": "score = 0.6*interest_overlap + 0.3*memory_overlap + 0.5 + bias_bonus",
+            "memory_hit_count": len(memory_hits),
+            "reasoning_summary": "Items are ranked by preference overlap and prior behavior evidence.",
+        }
+        conversational_response = (
+            self._build_conversational_response(top_recommendations, recommender_personality)
+            if conversational_mode
+            else None
+        )
+        return {
+            "recommendations": top_recommendations,
+            "conversational_response": conversational_response,
+            "explainability": explainability,
+        }
+
+    def _build_conversational_response(
+        self, recommendations: List[Dict[str, Any]], personality: str
+    ) -> str:
+        if not recommendations:
+            return "I could not find a strong match yet. Share more preferences and I can refine it."
+        names = ", ".join(item["item_name"] for item in recommendations)
+        if personality == "nigerian_twitter":
+            return f"Omo, based on your vibe, you should check these first: {names}."
+        if personality == "friend":
+            return f"I'd personally suggest starting with {names}. These feel like your kind of picks."
+        if personality == "coach":
+            return f"Solid move: prioritize {names}. They align with your current goals and usage pattern."
+        return f"Top recommendations: {names}. Ranked by profile-interest and memory relevance."
 
