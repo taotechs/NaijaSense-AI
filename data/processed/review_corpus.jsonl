@@ -1,0 +1,3 @@
+{"source": "yelp", "user_id": "y_seed_1", "item_id": "b_amala_1", "item_name": "Iya Aladura Amala Spot", "item_domain": "restaurant", "text": "Amala and gbegiri were rich and tasty, portion was fair.", "rating": 4.0}
+{"source": "yelp", "user_id": "y_seed_2", "item_id": "b_buka_2", "item_name": "Budget Buka", "item_domain": "restaurant", "text": "Affordable meal but service was slow and soup arrived cold.", "rating": 2.0}
+{"source": "amazon", "user_id": "a_seed_1", "item_id": "earbud_1", "item_name": "Budget Earbuds", "item_domain": "tech", "text": "Battery life impressed me and bass was clean for the price.", "rating": 4.5}
