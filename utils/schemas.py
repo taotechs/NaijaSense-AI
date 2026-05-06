@@ -66,6 +66,10 @@ class RecommendationRequest(BaseModel):
         default=True,
         description="If true, API returns a chat-style recommendation summary.",
     )
+    conversation_history: List[str] = Field(
+        default_factory=list,
+        description="Previous user turns for multi-turn recommendation context.",
+    )
 
 
 class RecommendationItem(BaseModel):
