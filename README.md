@@ -186,6 +186,19 @@ Included metrics:
 - Task A: ROUGE / BERTScore / RMSE
 - Task B: NDCG@10 / Hit Rate@10
 
+## Real Dataset Pipeline (Yelp / Amazon / Goodreads-ready)
+
+Build a normalized corpus (JSONL) for retrieval-grounded generation:
+
+```bash
+python scripts/build_review_corpus.py --output data/processed/review_corpus.jsonl --limit 500 --use_hf
+```
+
+Notes:
+- `--use_hf` attempts to ingest public HuggingFace datasets (`yelp_review_full`, `amazon_polarity`).
+- Goodreads normalization is supported via schema adapters in `data_pipeline/normalize.py`.
+- Backend reads `data/processed/review_corpus.jsonl` and retrieves similar examples during review generation.
+
 ## Running Tests
 
 ```bash
