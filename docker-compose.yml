@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  naijasense-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: naijasense-api
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: production
+      API_PREFIX: /api/v1
+      MEMORY_BACKEND: inmemory
+    restart: unless-stopped
