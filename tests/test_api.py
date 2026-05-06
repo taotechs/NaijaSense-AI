@@ -47,6 +47,8 @@ def test_recommend() -> None:
         "candidate_items": ["Gadget Hub Subscription", "Kitchen Mixer", "Fashion Nova Bag"],
         "context": "Looking for useful everyday products",
         "top_k": 2,
+        "recommender_personality": "friend",
+        "conversational_mode": True,
     }
     response = client.post("/api/v1/recommend", json=payload)
     body = response.json()
@@ -54,6 +56,8 @@ def test_recommend() -> None:
     assert response.status_code == 200
     assert len(body["recommendations"]) == 2
     assert "reasoning_steps" in body
+    assert "conversational_response" in body
+    assert "explainability" in body
 
 
 def test_simulate_review_validation_error() -> None:
