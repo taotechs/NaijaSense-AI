@@ -2,6 +2,11 @@ import Link from "next/link";
 
 const cards = [
   {
+    title: "Chat Copilot (Recommended)",
+    href: "/chat",
+    description: "ChatGPT-style experience: type naturally, get recommendations/reviews plus reasoning."
+  },
+  {
     title: "Review Simulation",
     href: "/review",
     description: "Generate persona-aware product reviews with rating and cultural tone."
@@ -32,7 +37,7 @@ export default function HomePage() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
           <Link key={card.href} href={card.href} className="glass rounded-2xl p-5 transition hover:-translate-y-1">
             <h3 className="text-lg font-semibold text-slate-100">{card.title}</h3>
