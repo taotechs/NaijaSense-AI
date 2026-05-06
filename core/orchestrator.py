@@ -183,6 +183,8 @@ class NaijaSenseOrchestrator:
                 "candidate_items": request.candidate_items,
                 "memory_hits": memory_hits,
                 "top_k": request.top_k,
+                "recommender_personality": request.recommender_personality,
+                "conversational_mode": request.conversational_mode,
             }
         )
         reasoning_steps.append("Ranked candidate items with memory-informed scoring.")
@@ -206,5 +208,7 @@ class NaijaSenseOrchestrator:
             recommendations=rec_output["recommendations"],
             memory_retrieved=memory_hits,
             reasoning_steps=reasoning_steps,
+            conversational_response=rec_output.get("conversational_response"),
+            explainability=rec_output.get("explainability", {}),
         )
 
