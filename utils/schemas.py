@@ -58,6 +58,14 @@ class RecommendationRequest(BaseModel):
     )
     context: Optional[str] = Field(default=None, max_length=1000)
     top_k: int = Field(default=3, ge=1, le=20)
+    recommender_personality: str = Field(
+        default="analyst",
+        description="How recommendation response should sound: analyst, coach, friend, nigerian_twitter.",
+    )
+    conversational_mode: bool = Field(
+        default=True,
+        description="If true, API returns a chat-style recommendation summary.",
+    )
 
 
 class RecommendationItem(BaseModel):
@@ -70,6 +78,8 @@ class RecommendationResponse(BaseModel):
     recommendations: List[RecommendationItem]
     memory_retrieved: List[str]
     reasoning_steps: List[str]
+    conversational_response: Optional[str] = None
+    explainability: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ErrorResponse(BaseModel):
