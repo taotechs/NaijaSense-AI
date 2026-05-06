@@ -53,6 +53,10 @@ export default function ChatPage() {
 
       if (mode === "recommend") {
         const candidateItems = extractCandidateItems(userText);
+        const conversationHistory = messages
+          .filter((m) => m.role === "user")
+          .map((m) => m.content)
+          .slice(-5);
         const res = await recommendItems({
           user_profile: {
             user_id: userId,
@@ -62,6 +66,7 @@ export default function ChatPage() {
           },
           candidate_items: candidateItems,
           context: userText,
+          conversation_history: conversationHistory,
           top_k: 3,
           recommender_personality: "nigerian_twitter",
           conversational_mode: true
