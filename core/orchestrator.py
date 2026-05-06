@@ -191,6 +191,8 @@ class NaijaSenseOrchestrator:
                 "user_model": user_model,
                 "candidate_items": request.candidate_items,
                 "memory_hits": memory_hits,
+                "contextual_query": request.context or "",
+                "conversation_history": request.conversation_history,
                 "top_k": request.top_k,
                 "recommender_personality": request.recommender_personality,
                 "conversational_mode": request.conversational_mode,
