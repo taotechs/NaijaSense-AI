@@ -5,8 +5,10 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
 
 from core.orchestrator import NaijaSenseOrchestrator
+from memory.review_corpus_store import ReviewCorpusStore
 from memory.user_memory import UserMemory
 from memory.vector_store import InMemoryVectorStore
+from utils.config import settings
 from utils.logger import get_logger
 from utils.schemas import (
     ErrorResponse,
@@ -20,7 +22,8 @@ router = APIRouter()
 
 _vector_store = InMemoryVectorStore()
 _user_memory = UserMemory(vector_store=_vector_store)
-_orchestrator = NaijaSenseOrchestrator(user_memory=_user_memory)
+_corpus_store = ReviewCorpusStore(corpus_path=settings.review_corpus_path)
+_orchestrator = NaijaSenseOrchestrator(user_memory=_user_memory, corpus_store=_corpus_store)
 _logger = get_logger("naijasense.api")
 
 
