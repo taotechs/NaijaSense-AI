@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     default_persona_style: str = "nigerian_twitter"
     max_history_items: int = 30
     model_name: str = "gpt-4o-mini"
+    review_corpus_path: str = "data/processed/review_corpus.jsonl"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
