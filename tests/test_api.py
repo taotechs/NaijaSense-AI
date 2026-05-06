@@ -21,8 +21,10 @@ def test_simulate_review() -> None:
             "interests": ["fashion", "gadgets"],
             "sentiment_bias": "positive",
         },
-        "item_name": "Wireless Earbuds Pro",
-        "item_context": "Battery lasts all day and bass is clean.",
+        "item_data": {
+            "item_name": "Wireless Earbuds Pro",
+            "item_context": "Battery lasts all day and bass is clean.",
+        },
         "persona_style": "nigerian_twitter",
     }
     response = client.post("/api/v1/simulate-review", json=payload)
@@ -52,4 +54,16 @@ def test_recommend() -> None:
     assert response.status_code == 200
     assert len(body["recommendations"]) == 2
     assert "reasoning_steps" in body
+
+
+def test_simulate_review_validation_error() -> None:
+    payload = {
+        "user_profile": {"user_id": "u1"},
+        "item_data": {"item_name": ""},
+    }
+    response = client.post("/api/v1/simulate-review", json=payload)
+    body = response.json()
+
+    assert response.status_code == 422
+    assert body["error"] == "validation_error"
 
