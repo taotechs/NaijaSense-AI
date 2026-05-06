@@ -199,6 +199,17 @@ Notes:
 - Goodreads normalization is supported via schema adapters in `data_pipeline/normalize.py`.
 - Backend reads `data/processed/review_corpus.jsonl` and retrieves similar examples during review generation.
 
+## Competition Readiness Checklist
+
+- Task A API/Web flow available (persona + item -> review + rating) ✅
+- Task B API/Web flow available (persona -> recommendations) ✅
+- Cold-start handling in recommendation scoring ✅
+- Cross-domain scoring signal and explainability ✅
+- Multi-turn conversational context support (`conversation_history`) ✅
+- Dataset normalization pipeline (Yelp/Amazon/Goodreads-ready) ✅
+- Evaluation scripts (ROUGE/BERTScore/RMSE/NDCG/HitRate + fidelity helper) ✅
+- Solution paper template available at `docs/SOLUTION_PAPER_TEMPLATE.md` ✅
+
 ## Running Tests
 
 ```bash
