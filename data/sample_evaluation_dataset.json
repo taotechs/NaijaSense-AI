@@ -1,0 +1,59 @@
+{
+  "task_a": [
+    {
+      "pred_review": "Omo this phone camera sharp well, battery lasted me all day and I enjoyed it.",
+      "gold_review": "The phone camera is very sharp and the battery performance lasts all day.",
+      "pred_rating": 4.6,
+      "gold_rating": 4.5
+    },
+    {
+      "pred_review": "The blender works fine but it's noisy sometimes, still okay for daily use.",
+      "gold_review": "This blender is useful for everyday use, though it can be noisy at times.",
+      "pred_rating": 3.8,
+      "gold_rating": 4.0
+    },
+    {
+      "pred_review": "I liked the sneakers design but comfort dropped after long walks.",
+      "gold_review": "The sneaker design is attractive, but long-walk comfort is average.",
+      "pred_rating": 3.3,
+      "gold_rating": 3.5
+    }
+  ],
+  "task_b": [
+    {
+      "ranked_items": [
+        "Wireless Earbuds Pro",
+        "Fitness Smartwatch",
+        "Kitchen Mixer",
+        "Gaming Mouse"
+      ],
+      "relevant_items": [
+        "Fitness Smartwatch",
+        "Wireless Earbuds Pro"
+      ]
+    },
+    {
+      "ranked_items": [
+        "Fashion Nova Bag",
+        "Running Shoes",
+        "Cookware Set",
+        "Coffee Grinder"
+      ],
+      "relevant_items": [
+        "Running Shoes"
+      ]
+    },
+    {
+      "ranked_items": [
+        "Budget Laptop",
+        "Mechanical Keyboard",
+        "Noise Cancelling Headphones",
+        "Desk Lamp"
+      ],
+      "relevant_items": [
+        "Noise Cancelling Headphones",
+        "Mechanical Keyboard"
+      ]
+    }
+  ]
+}
