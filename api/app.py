@@ -1,6 +1,8 @@
 """FastAPI application setup."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from api.routes import router
 from utils.config import settings
@@ -12,4 +14,28 @@ app = FastAPI(
 )
 
 app.include_router(router, prefix=settings.api_prefix)
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "validation_error",
+            "detail": "Request body failed validation.",
+            "issues": exc.errors(),
+            "path": str(request.url.path),
+        },
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    detail = exc.detail if isinstance(exc.detail, dict) else {"error": "http_error", "detail": str(exc.detail)}
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={**detail, "path": str(request.url.path)},
+    )
 
