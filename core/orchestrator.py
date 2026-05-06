@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List
 from agents.recommendation import RecommendationAgent
 from agents.review_generation import ReviewGenerationAgent
 from agents.user_modeling import UserModelingAgent
+from memory.review_corpus_store import ReviewCorpusStore
 from memory.user_memory import UserMemory
 from models.llm_wrapper import LLMWrapper
 from utils.config import settings
@@ -32,12 +33,13 @@ class WorkflowPlan:
 class NaijaSenseOrchestrator:
     """Coordinates agents with dynamic planning and decision logging."""
 
-    def __init__(self, user_memory: UserMemory) -> None:
+    def __init__(self, user_memory: UserMemory, corpus_store: ReviewCorpusStore | None = None) -> None:
         llm = LLMWrapper(model_name=settings.model_name)
         self.user_modeling_agent = UserModelingAgent(llm=llm)
         self.review_generation_agent = ReviewGenerationAgent(llm=llm)
         self.recommendation_agent = RecommendationAgent()
         self.user_memory = user_memory
+        self.corpus_store = corpus_store
         self.logger = get_logger("naijasense.orchestrator")
         self._hooks: Dict[str, List[Callable[[Dict[str, Any]], None]]] = {
             "before_step": [],
@@ -116,11 +118,18 @@ class NaijaSenseOrchestrator:
         self._emit("after_step", {"flow": plan.flow_name, "step": plan.steps[1]})
 
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[2]})
+        review_query = f"{request.item_data.item_name} {request.item_data.item_context or ''}".strip()
+        retrieved_examples = (
+            self.corpus_store.search(review_query, top_k=3) if self.corpus_store else []
+        )
+        if retrieved_examples:
+            reasoning_steps.append("Retrieved similar examples from external review corpus.")
         review_output = self.review_generation_agent.run(
             {
                 "user_model": user_model,
                 "item_name": request.item_data.item_name,
                 "item_context": request.item_data.item_context or "",
+                "retrieved_examples": retrieved_examples,
             }
         )
         reasoning_steps.append("Generated review output with persona-conditioned tone.")
