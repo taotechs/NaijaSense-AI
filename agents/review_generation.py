@@ -23,11 +23,8 @@ class ReviewGenerationAgent(BaseAgent):
         rating = rating_map.get(user_model["bias"], 3.8)
 
         if user_model["persona_style"] == "nigerian_twitter":
-            seed_text = (
-                f"Omo, I just tried {item_name}. "
-                f"{item_context or 'The overall vibe is decent sha.'} "
-                "No cap, this one get potential."
-            )
+            sentiment_line = self._nigerian_sentiment_line(user_model.get("bias", "balanced"))
+            seed_text = f"{sentiment_line} {item_context or 'E get strong points, but no be perfect.'}"
         else:
             seed_text = (
                 f"My experience with {item_name} was mostly positive. "
@@ -46,4 +43,17 @@ class ReviewGenerationAgent(BaseAgent):
             "rating": round(rating, 1),
             "persona_breakdown": user_model,
         }
+
+    @staticmethod
+    def _nigerian_sentiment_line(bias: str) -> str:
+        """
+        Return localized opening lines with controlled slang intensity.
+
+        This improves cultural realism for demo quality while keeping output readable.
+        """
+        if bias == "critical":
+            return "This place no try at all for this kind thing."
+        if bias == "positive":
+            return "Omo this one slap! I just tried am now now."
+        return "Omo, I don test am and e dey okay sha."
 
