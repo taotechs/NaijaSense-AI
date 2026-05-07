@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import secrets
 from typing import Any, Dict, List
 
 from agents.base import BaseAgent
@@ -27,7 +28,7 @@ class ReviewGenerationAgent(BaseAgent):
             persona_style=user_model.get("persona_style", "formal"),
             bias=user_model.get("bias", "balanced"),
             domain=domain,
-            seed=f"{item_name}|{item_context}|{user_model.get('user_id', '')}",
+            seed=f"{item_name}|{item_context}|{user_model.get('user_id', '')}|{secrets.token_hex(4)}",
         )
         detail_sentence = self._build_detail_sentence(
             item_name=item_name,
@@ -127,13 +128,33 @@ class ReviewGenerationAgent(BaseAgent):
 
     @staticmethod
     def _infer_domain(item_name: str, item_context: str) -> str:
-        text = f"{item_name} {item_context}".lower()
-        if any(k in text for k in ["amala", "gbegiri", "food", "restaurant", "buka", "ewedu", "jollof"]):
-            return "food"
-        if any(k in text for k in ["earbud", "phone", "laptop", "smartwatch", "tech", "gadget"]):
+        """Avoid classifying as food from a lone 'food' word in context (e.g. boilerplate reviews)."""
+        name = (item_name or "").lower()
+        ctx = (item_context or "").lower()
+
+        if any(k in name for k in ["earbud", "phone", "laptop", "smartwatch", "tech", "gadget", "charger", "keyboard", "hub"]):
             return "tech"
-        if any(k in text for k in ["bag", "shoe", "fashion", "cloth", "sneaker"]):
+        if any(k in name for k in ["bag", "shoe", "fashion", "cloth", "sneaker", "dress"]):
             return "fashion"
+
+        strong_food = (
+            "amala",
+            "gbegiri",
+            "buka",
+            "jollof",
+            "ewedu",
+            "restaurant",
+            "suya",
+            "kitchen",
+            "chef",
+            "menu",
+        )
+        if any(k in name for k in strong_food) or any(k in ctx for k in strong_food):
+            return "food"
+        if re.search(r"\bfood\b", ctx) and re.search(
+            r"\b(meal|dish|plate|menu|taste|flavor|dining|portion|cooked|served)\b", ctx
+        ):
+            return "food"
         return "general"
 
     @staticmethod
@@ -154,5 +175,7 @@ class ReviewGenerationAgent(BaseAgent):
         if retrieved_examples:
             avg = sum(float(x.get("rating", 3.5)) for x in retrieved_examples) / len(retrieved_examples)
             base = (base * 0.7) + (avg * 0.3)
-        return max(1.0, min(5.0, base))
+        # Small per-request spread so repeat calls are not identical in logs/UI.
+        jitter = (secrets.randbelow(201) - 100) / 1000.0
+        return max(1.0, min(5.0, base + jitter))
 

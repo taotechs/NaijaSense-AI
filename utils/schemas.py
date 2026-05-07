@@ -90,3 +90,49 @@ class ErrorResponse(BaseModel):
     error: str
     detail: str
 
+
+# --- Unified agent gateway (/api/agent/v1) ---
+
+
+class UserPersonaInput(BaseModel):
+    """Flexible persona for the unified chat agent."""
+
+    user_id: str = Field(default="agent_user", min_length=1)
+    location: Optional[str] = "Lagos"
+    interests: List[str] = Field(default_factory=list)
+    sentiment_bias: Optional[str] = Field(default="balanced", description="positive | balanced | critical")
+    tone_notes: Optional[str] = Field(default=None, max_length=2000, description="Free-form style hints")
+    history: Optional[str] = Field(
+        default=None,
+        max_length=8000,
+        description="Optional pasted history or profile narrative (fed into context).",
+    )
+
+
+class AgentGatewayRequest(BaseModel):
+    user_persona: UserPersonaInput
+    query: str = Field(..., min_length=1, max_length=8000)
+    top_k: int = Field(default=4, ge=1, le=20)
+
+
+class AgentReviewResult(BaseModel):
+    review_text: str
+    rating: float = Field(..., ge=1.0, le=5.0)
+    persona_breakdown: Dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentRecommendationResult(BaseModel):
+    recommendations: List[RecommendationItem]
+    conversational_response: Optional[str] = None
+    explainability: Dict[str, Any] = Field(default_factory=dict)
+    memory_retrieved: List[str] = Field(default_factory=list)
+
+
+class AgentGatewayResponse(BaseModel):
+    task: str = Field(description="review | recommend")
+    orchestrator_rationale: str
+    routing_source: str = Field(description="llm | heuristic")
+    review: Optional[AgentReviewResult] = None
+    recommendation: Optional[AgentRecommendationResult] = None
+    reasoning_steps: List[str] = Field(default_factory=list)
+

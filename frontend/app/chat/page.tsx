@@ -5,6 +5,7 @@ import { recommendItems, simulateReview } from "@/lib/api";
 import {
   extractCandidateItems,
   extractInterests,
+  extractReviewItemName,
   inferChatMode,
   inferPersonaStyle,
   inferSentimentBias
@@ -85,7 +86,7 @@ export default function ChatPage() {
           }
         ]);
       } else {
-        const itemGuess = interests[0] === "general lifestyle" ? "General Product" : `${interests[0]} option`;
+        const itemName = extractReviewItemName(userText, interests);
         const res = await simulateReview({
           user_profile: {
             user_id: userId,
@@ -94,7 +95,7 @@ export default function ChatPage() {
             sentiment_bias: sentiment
           },
           item_data: {
-            item_name: itemGuess,
+            item_name: itemName,
             item_context: userText
           },
           persona_style: personaStyle

@@ -1,0 +1,5 @@
+{"source": "yelp", "user_id": "off_y_1", "item_id": "off_b_1", "item_name": "Mama Put Corner", "item_domain": "restaurant", "text": "Jollof was smoky and pepper balanced well. Will come back.", "rating": 4.5}
+{"source": "yelp", "user_id": "off_y_2", "item_id": "off_b_2", "item_name": "Late Night Suya Stand", "item_domain": "restaurant", "text": "Suya was dry today and they ran out of onions.", "rating": 2.5}
+{"source": "amazon", "user_id": "off_a_1", "item_id": "off_asin_1", "item_name": "USB-C Hub", "item_domain": "tech", "text": "Ports work but it runs warm under load.", "rating": 3.5}
+{"source": "amazon", "user_id": "off_a_2", "item_id": "off_asin_2", "item_name": "Non-stick Pan Set", "item_domain": "kitchen", "text": "Nothing sticks so far; handles feel solid.", "rating": 4.0}
+{"source": "goodreads", "user_id": "off_g_1", "item_id": "off_book_1", "item_name": "Things Fall Apart", "item_domain": "books", "text": "Sparse prose with a heavy ending; stayed with me.", "rating": 5.0}

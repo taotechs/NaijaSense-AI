@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const links = [
   { href: "/", label: "Home" },
+  { href: "/unified", label: "Unified Agent" },
   { href: "/chat", label: "Chat Copilot" },
   { href: "/review", label: "Review Simulation" },
   { href: "/recommend", label: "Recommendations" },
@@ -13,6 +15,11 @@ const links = [
 
 export function NavBar() {
   const pathname = usePathname();
+  const [navReady, setNavReady] = useState(false);
+
+  useEffect(() => {
+    setNavReady(true);
+  }, []);
 
   return (
     <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur">
@@ -23,7 +30,7 @@ export function NavBar() {
         </div>
         <nav className="flex flex-wrap items-center gap-2">
           {links.map((link) => {
-            const active = pathname === link.href;
+            const active = navReady && pathname === link.href;
             return (
               <Link
                 key={link.href}

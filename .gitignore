@@ -2,6 +2,15 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .env
+.venv/
+venv/
+
+# Hugging Face / dataset download caches
+.hf_cache/
+.cache/
+
+# Local Kaggle CSV downloads (use script or manual export; do not commit blobs)
+data/raw/kaggle/
 
 # Frontend / Next.js
 frontend/node_modules/

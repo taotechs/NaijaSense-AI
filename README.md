@@ -78,8 +78,9 @@ This keeps outputs natural, culturally familiar, and demo-friendly.
 - Python 3.10+
 - FastAPI
 - Modular multi-agent architecture
-- Vector memory (in-memory now, Chroma/FAISS-ready)
-- Docker + Docker Compose
+- Vector memory (in-memory; **Chroma** included in Docker Compose for persistence / future LangChain RAG)
+- LangChain orchestration for `/api/agent/v1` (OpenAI or Groq when configured)
+- Docker + Docker Compose (API + Next.js frontend + Chroma)
 
 ## Project Structure
 
@@ -107,6 +108,15 @@ This keeps outputs natural, culturally familiar, and demo-friendly.
 - `GET /api/v1/health`
 - `POST /api/v1/simulate-review`
 - `POST /api/v1/recommend`
+- `POST /api/agent/v1` — **unified gateway**: JSON body `user_persona` + `query`; LangChain (or heuristic) routes to Task A or B. See `.env.example` for `ORCHESTRATOR_PROVIDER`, `OPENAI_API_KEY`, `GROQ_API_KEY`.
+
+### Unified chat UI
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Open [http://localhost:3000/unified](http://localhost:3000/unified). Set `NEXT_PUBLIC_AGENT_API_URL` if the API is not on `http://127.0.0.1:8000/api/agent/v1`.
 
 ## How To Run
 
@@ -127,11 +137,17 @@ docker build -t naijasense-ai .
 docker run --rm -p 8000:8000 naijasense-ai
 ```
 
-### Docker Compose
+### Docker Compose (API + frontend + Chroma)
 
 ```bash
 docker compose up --build
 ```
+
+- **API:** [http://localhost:8000](http://localhost:8000) (Swagger: `/docs`)
+- **Frontend:** [http://localhost:3000/unified](http://localhost:3000/unified)
+- **Chroma:** [http://localhost:18000](http://localhost:18000) (HTTP API; optional client wiring)
+
+Optional LLM routing: create a `.env` next to `docker-compose.yml` with `ORCHESTRATOR_PROVIDER=groq` and `GROQ_API_KEY=...` (or `openai` + `OPENAI_API_KEY`). If unset, routing uses fast **heuristics** (tests stay offline).
 
 ## Demo Payloads (Judge Friendly)
 
@@ -194,8 +210,26 @@ Build a normalized corpus (JSONL) for retrieval-grounded generation:
 python scripts/build_review_corpus.py --output data/processed/review_corpus.jsonl --limit 500 --use_hf
 ```
 
+**Kaggle (CSV mirrors / community splits):** datasets are free, but Kaggle still expects a **logged-in account** to download (browser or API)—there is no anonymous bulk URL. You do **not** have to use the API: unzip a manual download and point the script at it, or let the API fill `data/raw/kaggle/<owner>_<name>/` once; after that, cached CSVs are read **without** calling `kaggle` again.
+
+API automation (optional): [create a Kaggle API token](https://www.kaggle.com/docs/api), save `kaggle.json` under `~/.kaggle/` (Windows: `C:\Users\<you>\.kaggle\kaggle.json`), accept each dataset’s rules on the website if prompted, then:
+
+```bash
+pip install -r requirements.txt
+python scripts/build_review_corpus.py --output data/processed/review_corpus.jsonl --limit 500 --use_kaggle
+```
+
+Manual download (no API): unzip so one or more `.csv` files sit in a folder, then:
+
+```bash
+python scripts/build_review_corpus.py --use_kaggle --kaggle_sources amazon --kaggle_amazon_dir path/to/unzipped_folder --limit 500
+```
+
+Use `--kaggle_sources amazon` or `yelp` to pull only one source; override slugs with `--kaggle_amazon_slug` / `--kaggle_yelp_slug` if you switch datasets. Defaults point at community CSVs (`yacharki/amazon-reviews-for-sa-binary-negative-positive-csv`, `luisfredgs/yelp-reviews-csv`); column names are detected flexibly.
+
 Notes:
 - `--use_hf` attempts to ingest public HuggingFace datasets (`yelp_review_full`, `amazon_polarity`).
+- `--extra_jsonl` loads pre-normalized lines with no Hub or Kaggle (see `data/offline_review_samples.jsonl`).
 - Goodreads normalization is supported via schema adapters in `data_pipeline/normalize.py`.
 - Backend reads `data/processed/review_corpus.jsonl` and retrieves similar examples during review generation.
 

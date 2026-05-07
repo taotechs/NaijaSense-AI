@@ -60,6 +60,40 @@ def test_recommend() -> None:
     assert "explainability" in body
 
 
+def test_agent_gateway_review_heuristic() -> None:
+    payload = {
+        "user_persona": {
+            "user_id": "u_agent",
+            "location": "Lagos",
+            "interests": ["food"],
+            "sentiment_bias": "positive",
+        },
+        "query": "Review Iya Amala — jollof was smoky and pepper balanced.",
+        "top_k": 3,
+    }
+    response = client.post("/api/agent/v1", json=payload)
+    body = response.json()
+    assert response.status_code == 200
+    assert body["task"] == "review"
+    assert body["review"] is not None
+    assert body["review"]["rating"] >= 1.0
+    assert body["routing_source"] in ("llm", "heuristic")
+
+
+def test_agent_gateway_recommend_heuristic() -> None:
+    payload = {
+        "user_persona": {"user_id": "u_agent2", "interests": ["food"]},
+        "query": "What should I eat tonight in Lagos? Something not too expensive.",
+        "top_k": 3,
+    }
+    response = client.post("/api/agent/v1", json=payload)
+    body = response.json()
+    assert response.status_code == 200
+    assert body["task"] == "recommend"
+    assert body["recommendation"] is not None
+    assert len(body["recommendation"]["recommendations"]) >= 1
+
+
 def test_simulate_review_validation_error() -> None:
     payload = {
         "user_profile": {"user_id": "u1"},

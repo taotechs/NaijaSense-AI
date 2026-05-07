@@ -1,5 +1,77 @@
 type ChatMode = "review" | "recommend";
 
+/** Reject keyboard-mash / non-word tokens from interest extraction. */
+export function isPlausibleWord(token: string): boolean {
+  const t = token.toLowerCase();
+  if (t.length < 3 || t.length > 22) return false;
+  if (!/[aeiouy]/.test(t)) return false;
+  const vowels = (t.match(/[aeiouy]/g) ?? []).length;
+  if (t.length >= 6 && vowels / t.length < 0.18) return false;
+  let cons = 0;
+  let maxCons = 0;
+  for (const ch of t) {
+    if (/[aeiouy]/.test(ch)) {
+      cons = 0;
+    } else {
+      cons += 1;
+      maxCons = Math.max(maxCons, cons);
+    }
+  }
+  if (maxCons > 4) return false;
+  return true;
+}
+
+/** Pick a human-readable item name for review simulation from chat text + interests. */
+export function extractReviewItemName(prompt: string, interests: string[]): string {
+  const trimmed = prompt.trim();
+  if (!trimmed) return "General Product";
+
+  const quoted = trimmed.match(/["']([^"']{2,60})["']/);
+  if (quoted?.[1]) {
+    const inner = quoted[1].trim();
+    if (inner.length >= 2) return inner.charAt(0).toUpperCase() + inner.slice(1);
+  }
+
+  const patterns: RegExp[] = [
+    /\b(?:review|rate)\s+(?:for|about|on)\s+(.+?)(?:[.?!]|$)/i,
+    /\b(?:try(?:ing)?|tried)\s+(.+?)(?:\s+and|\s+at|\s+in\b|[.?!]|$)/i,
+    /\babout\s+(?:the\s+)?(.+?)(?:[.?!]|$)/i,
+    /\bfor\s+(.+?)\s+(?:restaurant|spot|place|buka|product)\b/i
+  ];
+  for (const p of patterns) {
+    const m = trimmed.match(p);
+    if (m?.[1]) {
+      let cand = m[1].replace(/\s+/g, " ").trim().replace(/^(the|a|an)\s+/i, "").slice(0, 80);
+      if (cand.length >= 2) {
+        cand = cand.replace(/\s+option$/i, "");
+        return cand.charAt(0).toUpperCase() + cand.slice(1);
+      }
+    }
+  }
+
+  const firstLine = trimmed.split(/\n/)[0] ?? trimmed;
+  const words = firstLine
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-zA-Z']/g, "").toLowerCase())
+    .filter((w) => w.length >= 3 && !STOPWORDS.has(w));
+  const concrete = words.find((w) => isPlausibleWord(w) && !GENERIC_INTERESTS.has(w));
+  if (concrete) {
+    return concrete.charAt(0).toUpperCase() + concrete.slice(1);
+  }
+
+  const goodInterest = interests.find(
+    (i) =>
+      i !== "general lifestyle" &&
+      !GENERIC_INTERESTS.has(i) &&
+      (/\s/.test(i) || isPlausibleWord(i))
+  );
+  if (goodInterest) {
+    return goodInterest.charAt(0).toUpperCase() + goodInterest.slice(1);
+  }
+
+  return "General Product";
+}
+
 export function inferChatMode(prompt: string): ChatMode {
   const text = prompt.toLowerCase();
   if (
@@ -36,7 +108,7 @@ export function extractInterests(prompt: string): string[] {
   }
 
   const tokenInterests = tokenize(text).filter(
-    (t) => t.length > 3 && !STOPWORDS.has(t) && /^[a-z]+$/.test(t)
+    (t) => t.length > 3 && !STOPWORDS.has(t) && /^[a-z]+$/.test(t) && isPlausibleWord(t)
   );
   const combined = [...mapped, ...tokenInterests].slice(0, 8);
   return combined.length > 0 ? [...new Set(combined)] : ["general lifestyle"];
@@ -97,7 +169,7 @@ export function extractCandidateItems(prompt: string): string[] {
   }
 
   if (candidates.length === 0) {
-    const tokens = tokenize(text).filter((t) => t.length > 3 && !STOPWORDS.has(t));
+    const tokens = tokenize(text).filter((t) => t.length > 3 && !STOPWORDS.has(t) && isPlausibleWord(t));
     for (const token of tokens.slice(0, 4)) {
       candidates.push(`${capitalize(token)} Popular Pick`);
     }
@@ -125,6 +197,19 @@ const STOPWORDS = new Set([
   "cheap",
   "good",
   "best"
+]);
+
+/** Too vague to use alone as an item name (prefer a noun from the message). */
+const GENERIC_INTERESTS = new Set([
+  "food",
+  "tech",
+  "music",
+  "travel",
+  "fashion",
+  "gadgets",
+  "restaurants",
+  "general",
+  "lifestyle"
 ]);
 
 function normalize(text: string): string {

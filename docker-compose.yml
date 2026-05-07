@@ -1,6 +1,16 @@
 version: "3.9"
 
 services:
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: naijasense-chroma
+    ports:
+      - "18000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      ANONYMIZED_TELEMETRY: "false"
+
   naijasense-api:
     build:
       context: .
@@ -11,5 +21,28 @@ services:
     environment:
       APP_ENV: production
       API_PREFIX: /api/v1
-      MEMORY_BACKEND: inmemory
+      ORCHESTRATOR_PROVIDER: ${ORCHESTRATOR_PROVIDER:-none}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+    depends_on:
+      - chroma
     restart: unless-stopped
+
+  naijasense-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_AGENT_API_URL: http://127.0.0.1:8000/api/agent/v1
+    container_name: naijasense-web
+    ports:
+      - "3000:3000"
+    depends_on:
+      - naijasense-api
+    restart: unless-stopped
+
+volumes:
+  chroma_data: {}
