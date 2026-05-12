@@ -197,28 +197,56 @@ class NaijaSenseOrchestrator:
 
     # ---- Task A ------------------------------------------------------
 
-    def simulate_review(self, request: ReviewSimulationRequest) -> ReviewSimulationResponse:
+    def simulate_review(
+        self,
+        request: ReviewSimulationRequest,
+        *,
+        skip_history: bool = False,
+        language: str = "english",
+        on_step: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> ReviewSimulationResponse:
         reasoning_steps: List[str] = []
         plan = self._plan_task_a(request)
         reasoning_steps.append(f"Planned {plan.flow_name}: {plan.rationale}")
         self._log_decision("plan_workflow", {"flow": plan.flow_name, "steps": plan.steps})
+        if on_step:
+            on_step({"type": "plan", "flow": plan.flow_name, "steps": plan.steps})
 
-        # Step 1 — silent context retrieval.
+        # Step 1 — silent context retrieval (skipped on demand for A/B compare).
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[0]})
-        ctx = self._silent_context_retrieval(request.user_profile.user_id)
-        reasoning_steps.append(ctx.reasoning_line())
+        if on_step:
+            on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[0]})
+        if skip_history:
+            ctx = SilentContext(
+                user_id=request.user_profile.user_id,
+                history_entries=[],
+                history_snippets=[],
+                historical_persona=HistoricalPersona(user_id=request.user_profile.user_id),
+            )
+            reasoning_steps.append(
+                "Silent context: SKIPPED (compare-mode / include_history=false). "
+                "Persona is derived purely from UI overrides."
+            )
+        else:
+            ctx = self._silent_context_retrieval(request.user_profile.user_id)
+            reasoning_steps.append(ctx.reasoning_line())
         self._log_decision(
             self.SILENT_RETRIEVAL_STEP,
             {
                 "user_id": ctx.user_id,
                 "n_history": len(ctx.history_entries),
                 "historical_persona": ctx.historical_persona.to_dict(),
+                "skipped": skip_history,
             },
         )
         self._emit("after_step", {"flow": plan.flow_name, "step": plan.steps[0]})
+        if on_step:
+            on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[0]})
 
         # Step 2 — reasoning about persona strategy.
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[1]})
+        if on_step:
+            on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[1]})
         reasoning_steps.append(
             "Reasoned about persona strategy: history baseline + UI overrides."
         )
@@ -227,9 +255,13 @@ class NaijaSenseOrchestrator:
             {"persona_style": request.persona_style or settings.default_persona_style},
         )
         self._emit("after_step", {"flow": plan.flow_name, "step": plan.steps[1]})
+        if on_step:
+            on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[1]})
 
         # Step 3 — build persona (history + UI override).
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[2]})
+        if on_step:
+            on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[2]})
         user_model = self.user_modeling_agent.run(
             {
                 "user_profile": request.user_profile,
@@ -238,6 +270,9 @@ class NaijaSenseOrchestrator:
                 "historical_persona": ctx.historical_persona.to_dict(),
             }
         )
+        # Thread the output-language preference into the user_model so the
+        # generator prompt can apply a hard rule (english | pidgin | yoruba_mix).
+        user_model["language"] = language
         merge_meta = user_model.get("merge_meta") or {}
         reasoning_steps.append(
             "Built persona by merging historical baseline with UI overrides "
@@ -253,9 +288,13 @@ class NaijaSenseOrchestrator:
             },
         )
         self._emit("after_step", {"flow": plan.flow_name, "step": plan.steps[2]})
+        if on_step:
+            on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[2]})
 
         # Step 4 — generate review.
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[3]})
+        if on_step:
+            on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[3]})
         review_query = f"{request.item_data.item_name} {request.item_data.item_context or ''}".strip()
         retrieved_examples = (
             self.corpus_store.search(review_query, top_k=3) if self.corpus_store else []
@@ -293,17 +332,33 @@ class NaijaSenseOrchestrator:
             },
         )
         self._emit("after_step", {"flow": plan.flow_name, "step": plan.steps[3]})
+        if on_step:
+            on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[3]})
 
         # Step 5 — persist to memory.
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[4]})
+        if on_step:
+            on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[4]})
         memory_note = f"Reviewed {request.item_data.item_name}: {review_output['review_text']}"
-        self.user_memory.save_interaction(user_id=request.user_profile.user_id, content=memory_note)
-        reasoning_steps.append("Stored generated review in memory for downstream tasks.")
+        # In skip_history A/B mode we do NOT want to pollute the user's memory
+        # with the no-history variant — that would corrupt the next request's
+        # baseline. The main pass still writes to memory.
+        if not skip_history:
+            self.user_memory.save_interaction(user_id=request.user_profile.user_id, content=memory_note)
+            reasoning_steps.append("Stored generated review in memory for downstream tasks.")
+        else:
+            reasoning_steps.append("Memory write SKIPPED (no-history compare variant).")
         self._log_decision(
             "persist_review_to_memory",
-            {"user_id": request.user_profile.user_id, "memory_preview": memory_note[:120]},
+            {
+                "user_id": request.user_profile.user_id,
+                "memory_preview": memory_note[:120],
+                "skipped": skip_history,
+            },
         )
         self._emit("after_step", {"flow": plan.flow_name, "step": plan.steps[4]})
+        if on_step:
+            on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[4]})
 
         # Surface the silent context on the persona breakdown so callers
         # and the UI can show what history was used.
@@ -320,28 +375,55 @@ class NaijaSenseOrchestrator:
 
     # ---- Task B ------------------------------------------------------
 
-    def recommend(self, request: RecommendationRequest) -> RecommendationResponse:
+    def recommend(
+        self,
+        request: RecommendationRequest,
+        *,
+        skip_history: bool = False,
+        language: str = "english",
+        on_step: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> RecommendationResponse:
         reasoning_steps: List[str] = []
         plan = self._plan_task_b(request)
         reasoning_steps.append(f"Planned {plan.flow_name}: {plan.rationale}")
         self._log_decision("plan_workflow", {"flow": plan.flow_name, "steps": plan.steps})
+        if on_step:
+            on_step({"type": "plan", "flow": plan.flow_name, "steps": plan.steps})
 
-        # Step 1 — silent context retrieval.
+        # Step 1 — silent context retrieval (skipped on demand for A/B compare).
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[0]})
-        ctx = self._silent_context_retrieval(request.user_profile.user_id)
-        reasoning_steps.append(ctx.reasoning_line())
+        if on_step:
+            on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[0]})
+        if skip_history:
+            ctx = SilentContext(
+                user_id=request.user_profile.user_id,
+                history_entries=[],
+                history_snippets=[],
+                historical_persona=HistoricalPersona(user_id=request.user_profile.user_id),
+            )
+            reasoning_steps.append(
+                "Silent context: SKIPPED (compare-mode / include_history=false)."
+            )
+        else:
+            ctx = self._silent_context_retrieval(request.user_profile.user_id)
+            reasoning_steps.append(ctx.reasoning_line())
         self._log_decision(
             self.SILENT_RETRIEVAL_STEP,
             {
                 "user_id": ctx.user_id,
                 "n_history": len(ctx.history_entries),
                 "historical_persona": ctx.historical_persona.to_dict(),
+                "skipped": skip_history,
             },
         )
         self._emit("after_step", {"flow": plan.flow_name, "step": plan.steps[0]})
+        if on_step:
+            on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[0]})
 
         # Step 2 — reason about retrieval strategy (chain-of-thought line).
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[1]})
+        if on_step:
+            on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[1]})
         query = f"{request.context or ''} {' '.join(request.candidate_items)}".strip()
         cot_parts = ["Reasoned about retrieval strategy"]
         if ctx.has_history:
@@ -365,13 +447,21 @@ class NaijaSenseOrchestrator:
             },
         )
         self._emit("after_step", {"flow": plan.flow_name, "step": plan.steps[1]})
+        if on_step:
+            on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[1]})
 
         # Step 3 — retrieve relevant memory (which now includes history).
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[2]})
-        memory_hits = self.user_memory.get_relevant_context(
-            user_id=request.user_profile.user_id,
-            query=query,
-            top_k=max(request.top_k, 3),
+        if on_step:
+            on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[2]})
+        memory_hits = (
+            []
+            if skip_history
+            else self.user_memory.get_relevant_context(
+                user_id=request.user_profile.user_id,
+                query=query,
+                top_k=max(request.top_k, 3),
+            )
         )
         reasoning_steps.append(
             f"Retrieved {len(memory_hits)} memory snippet(s) "
@@ -382,9 +472,13 @@ class NaijaSenseOrchestrator:
             {"user_id": request.user_profile.user_id, "memory_hit_count": len(memory_hits)},
         )
         self._emit("after_step", {"flow": plan.flow_name, "step": plan.steps[2]})
+        if on_step:
+            on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[2]})
 
         # Step 4 — rank.
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[3]})
+        if on_step:
+            on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[3]})
         user_model = self.user_modeling_agent.run(
             {
                 "user_profile": request.user_profile,
@@ -392,6 +486,7 @@ class NaijaSenseOrchestrator:
                 "historical_persona": ctx.historical_persona.to_dict(),
             }
         )
+        user_model["language"] = language
         rec_output = self.recommendation_agent.run(
             {
                 "user_model": user_model,
@@ -418,13 +513,19 @@ class NaijaSenseOrchestrator:
             },
         )
         self._emit("after_step", {"flow": plan.flow_name, "step": plan.steps[3]})
+        if on_step:
+            on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[3]})
 
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[4]})
+        if on_step:
+            on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[4]})
         self._log_decision(
             "return_ranked_output",
             {"top_k": request.top_k, "flow": plan.flow_name},
         )
         self._emit("after_step", {"flow": plan.flow_name, "step": plan.steps[4]})
+        if on_step:
+            on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[4]})
 
         explainability = dict(rec_output.get("explainability", {}))
         explainability["historical_signal"] = ctx.historical_persona.to_dict()
