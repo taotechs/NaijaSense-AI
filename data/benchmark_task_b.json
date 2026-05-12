@@ -1,0 +1,48 @@
+{
+  "corpus": "C:\\Users\\taotechs\\Desktop\\NaijaSense AI\\data\\processed\\review_corpus.jsonl",
+  "total_corpus_rows": 311,
+  "sample_size": 25,
+  "task": "b",
+  "results": [
+    {
+      "variant": "full",
+      "sample_size": 25,
+      "task_b": {
+        "ndcg@10": 0.061833,
+        "hit_rate@10": 0.2,
+        "samples": 25,
+        "candidate_pool_size": 20
+      }
+    },
+    {
+      "variant": "no_rag",
+      "sample_size": 25,
+      "task_b": {
+        "ndcg@10": 0.061833,
+        "hit_rate@10": 0.2,
+        "samples": 25,
+        "candidate_pool_size": 20
+      }
+    },
+    {
+      "variant": "no_critique",
+      "sample_size": 25,
+      "task_b": {
+        "ndcg@10": 0.061833,
+        "hit_rate@10": 0.2,
+        "samples": 25,
+        "candidate_pool_size": 20
+      }
+    },
+    {
+      "variant": "no_llm",
+      "sample_size": 25,
+      "task_b": {
+        "ndcg@10": 0.061833,
+        "hit_rate@10": 0.2,
+        "samples": 25,
+        "candidate_pool_size": 20
+      }
+    }
+  ]
+}
