@@ -23,9 +23,14 @@ class RecommendationAgent(BaseAgent):
 
         interests = [i.lower() for i in user_model.get("interests", [])]
         bias_bonus = 0.1 if user_model.get("bias") == "positive" else 0.0
-        query_terms = self._terms(f"{contextual_query} {' '.join(conversation_history)}")
+        query_blob = f"{contextual_query} {' '.join(conversation_history)}".strip()
+        query_terms = self._terms(query_blob)
         cold_start = len(memory_hits) == 0
         cross_domain = self._is_cross_domain(interests, candidate_items)
+        low_budget = bool(re.search(r"\b(under|below|less than|budget|cheap|affordable|[0-9]+k)\b", query_blob.lower()))
+        wants_spicy = bool(re.search(r"\b(spicy|pepper|hot)\b", query_blob.lower()))
+        wants_relax = bool(re.search(r"\b(relax|calm|chill|unwind|stress)\b", query_blob.lower()))
+        query_domain_hints = self._query_domain_hints(query_blob)
 
         scored = []
         for item in candidate_items:
@@ -33,25 +38,37 @@ class RecommendationAgent(BaseAgent):
             interest_overlap = sum(1 for tag in interests if tag in item_l)
             memory_overlap = sum(1 for hit in memory_hits if item_l in hit.lower())
             query_overlap = len(query_terms.intersection(self._terms(item_l)))
-            cold_start_bonus = 0.2 if cold_start and query_overlap > 0 else 0.0
-            cross_domain_bonus = 0.1 if cross_domain and query_overlap > 0 else 0.0
+            domain_alignment = 1 if any(h in item_l for h in query_domain_hints) else 0
+            spicy_bonus = 0.1 if wants_spicy and any(k in item_l for k in ("pepper", "suya", "jollof", "spicy")) else 0.0
+            budget_bonus = 0.1 if low_budget and any(k in item_l for k in ("budget", "under", "wallet", "affordable", "street")) else 0.0
+            relax_bonus = 0.1 if wants_relax and any(k in item_l for k in ("tea", "calm", "cozy", "relax", "chill", "cafe")) else 0.0
+            cold_start_bonus = 0.15 if cold_start and query_overlap > 0 else 0.0
+            cross_domain_bonus = 0.15 if cross_domain and query_overlap > 0 else 0.0
             score = round(
                 interest_overlap * 0.5
                 + memory_overlap * 0.25
                 + query_overlap * 0.2
+                + domain_alignment * 0.2
                 + 0.4
                 + bias_bonus
+                + spicy_bonus
+                + budget_bonus
+                + relax_bonus
                 + cold_start_bonus
                 + cross_domain_bonus,
                 3,
             )
+            # Penalize placeholder-y items that look like templates.
+            if any(k in item_l for k in ["starter pack", "bundle", "choice", "pick"]) and query_overlap == 0:
+                score = round(max(0.0, score - 0.25), 3)
             scored.append(
                 {
                     "item_name": item,
                     "score": score,
                     "explanation": (
                         f"Interest overlap={interest_overlap}, memory overlap={memory_overlap}, "
-                        f"context overlap={query_overlap}, cold-start boost={round(cold_start_bonus, 2)}."
+                        f"context overlap={query_overlap}, domain alignment={domain_alignment}, "
+                        f"bonus(spicy/budget/relax)={round(spicy_bonus + budget_bonus + relax_bonus, 2)}."
                     ),
                 }
             )
@@ -88,16 +105,33 @@ class RecommendationAgent(BaseAgent):
             return "I could not find a strong match yet. Share more preferences and I can refine it."
         names = ", ".join(item["item_name"] for item in recommendations)
         if personality == "nigerian_twitter":
-            return f"Omo, based on your vibe, you should check these first: {names}."
+            return f"Based on your vibe, start with {names}. These look strongest right now."
         if personality == "friend":
             return f"I'd personally suggest starting with {names}. These feel like your kind of picks."
         if personality == "coach":
             return f"Solid move: prioritize {names}. They align with your current goals and usage pattern."
-        return f"Top recommendations: {names}. Ranked by profile-interest and memory relevance."
+        return (
+            f"Top recommendations: {names}. "
+            "Ranking combines profile fit, memory evidence, and context overlap."
+        )
 
     @staticmethod
     def _terms(text: str) -> set[str]:
         return set(re.findall(r"[a-z0-9]+", text.lower()))
+
+    @staticmethod
+    def _query_domain_hints(query: str) -> set[str]:
+        q = query.lower()
+        hints: set[str] = set()
+        if any(k in q for k in ("eat", "food", "restaurant", "hungry", "dinner", "lunch", "breakfast")):
+            hints.update({"amala", "jollof", "suya", "shawarma", "buka", "kitchen", "food", "restaurant"})
+        if any(k in q for k in ("watch", "movie", "netflix", "series", "film")):
+            hints.update({"movie", "series", "drama", "comedy", "docu", "feature"})
+        if any(k in q for k in ("buy", "gadget", "tech", "device", "phone", "laptop")):
+            hints.update({"earbud", "charger", "hub", "watch", "keyboard", "tech"})
+        if any(k in q for k in ("relax", "calm", "stress", "unwind")):
+            hints.update({"tea", "cozy", "calm", "chill", "cafe"})
+        return hints
 
     @staticmethod
     def _is_cross_domain(interests: List[str], candidate_items: List[str]) -> bool:
