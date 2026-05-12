@@ -18,7 +18,6 @@ The system intentionally **separates a small fast router model from a strong gen
 - **Honest, reproducible benchmarks.** Ablation numbers in [`data/benchmark_results.json`](data/benchmark_results.json) measured on a held-out slice of Yelp + Goodreads + Amazon reviews, plus a behavioural-fidelity A/B harness ([`scripts/eval_fidelity.py`](scripts/eval_fidelity.py), [`docs/EVAL.md`](docs/EVAL.md)) that quantifies how much the silent history step moves the needle.
 - **Streaming agentic UX.** The unified gateway has a non-blocking NDJSON streaming sibling (`POST /api/agent/v1/stream`) that emits each reasoning step as it fires; the UI renders them as an animated timeline so the agent's thinking is visible in real time.
 - **Transparent reasoning.** Every response carries `reasoning_steps`, `safety_flags`, `timing_ms`, the routing path, and the critique-pass verdict — all surfaced in the UI as pills, badges, and an expandable trace.
-- **A/B behavioural fidelity, on demand.** A `compare_with_no_history` toggle runs the same query twice — once with the silent historical retrieval, once without — and returns both for side-by-side judging. Proves the differentiator on stage.
 - **Multi-language output.** A `language` field on the persona supports `english`, `pidgin`, and `yoruba_mix`, threaded into the generator prompt as a hard rule that overrides the persona-style preset.
 - **Two-model split.** Cheap router model (Groq Llama-3.1-8B) for classification + persona inference + safety critique; strong generator (Llama-3.3-70B) for writing. Cuts cost while keeping output quality high.
 - **Advisory safety layer.** Input is scanned for prompt-injection + PII shapes; output is checked for PII leakage and ungrounded numeric specifics. Findings surface as a non-blocking `safety_flags` array, never as a hard block.
@@ -54,8 +53,6 @@ flowchart LR
     RGA --> CRI[Critic LLM — router model]
     O --> MEM[(User Memory / Vector Store<br/>warmed from history)]
     O --> TRC[Reasoning Trace + safety_flags + timing_ms]
-    O -.compare_with_no_history.-> VAR[Variant Pass<br/>silent retrieval skipped]
-    VAR --> TRC
 ```
 
 ### Stateful agentic workflow (silent context retrieval)
@@ -157,7 +154,7 @@ The Behavioral Intelligence Hub gives the judge everything they need from one sc
 2. **Quick-start chips** with Nigerian context (Ikeja suya, late-night Yaba akara/noodles, Iya Eba jollof, Abuja-on-10k). One click fills the textarea.
 3. **Output language selector.** Three options — *English*, *Nigerian Pidgin*, *English + Yoruba mix* — threaded into the generator as a hard prompt rule that overrides the persona-style preset.
 4. **Behavioral profile (Task A user modeling).** A clearly labelled collapsible section with a **Quick preset** dropdown (Lagos foodie · VI lifestyle critic · Abuja professional · Campus student) plus manual fields for location, interests, sentiment bias, tone notes and history.
-5. **History controls.** A *"Use silent history"* checkbox toggles the silent retrieval step on/off; a *"Compare side-by-side with no-history variant"* checkbox additionally runs a control pass with retrieval disabled and renders both results stacked — the differentiator made visible on demand.
+5. **Silent history toggle.** When checked (default), the silent corpus retrieval step runs before routing; uncheck only for experimentation. The hub always shows **one** answer per submission.
 6. **Backend status pill.** A small pill in the page header pings `/api/v1/health` on mount (which doubles as a free-tier pre-warm) and polls every 60s. States: *checking → waking up… → ready · NNms → unreachable*.
 7. **Live agent trace.** While the request streams, an animated timeline fills in step-by-step (silent retrieval → persona strategy → build persona → generate → critique / persist). Each node has its own icon and pulses while active, so the agent's reasoning is visible rather than implied.
 
@@ -166,8 +163,7 @@ The Behavioral Intelligence Hub gives the judge everything they need from one sc
 8. **Result card** — task pill (`Task A · review` or `Task B · recommend`), routing source (`llm` vs `heuristic`), language tag, `NNms` latency, an amber `Critique applied` chip when the critique→regenerate loop fired, and the orchestrator's rationale.
 9. **Safety advisories.** Non-blocking flags from the validation layer surface as small amber chips with hover-tooltips (e.g. `prompt_injection_suspected`, `ungrounded_numeric_specifics`, `pii_phone_in_input`).
 10. **Thumbs feedback.** Every result card carries 👍 / 👎 buttons that POST to `/api/agent/feedback` and append to a JSONL log for later audit + few-shot fine-tuning fuel.
-11. **Side-by-side compare.** When the compare toggle is on, a second result card labelled *"Without history (control)"* appears under the main one so the impact of the silent retrieval step is immediately legible.
-12. **Agentic reasoning trace** — the same animated timeline, frozen on the final state, with the full numbered list of every reasoning line emitted by the orchestrator.
+11. **Agentic reasoning trace** — the same animated timeline, frozen on the final state, with the full numbered list of every reasoning line emitted by the orchestrator.
 
 ### Verify the stack in 30 seconds
 
@@ -222,7 +218,7 @@ If both pass, the submission is functional end-to-end.
 |---|---|---|
 | `user_persona.language` | `english` \| `pidgin` \| `yoruba_mix` | Hard language rule threaded into the generator prompt. Overrides `persona_style`. |
 | `include_history` | `bool` (default `true`) | When `false`, skips the silent historical-context step. Useful for A/B isolation. |
-| `compare_with_no_history` | `bool` (default `false`) | When `true` (and `include_history=true`), runs a second pass with history disabled and attaches it as `response.no_history_variant`. |
+| `compare_with_no_history` | `bool` (default `false`) | **Optional — not used by the public hub.** When `true` (and `include_history=true`), the API runs a second pass with history disabled and attaches it as `response.no_history_variant` (for scripts such as `scripts/eval_fidelity.py`). |
 
 ### New response fields
 
@@ -231,7 +227,7 @@ If both pass, the submission is functional end-to-end.
 | `safety_flags` | `string[]` | Advisory advisories: `prompt_injection_suspected`, `pii_email_in_input`, `ungrounded_numeric_specifics`, etc. Never blocking. |
 | `timing_ms` | `int` | End-to-end server latency, surfaced as a UI pill. |
 | `language` | `string` | The language actually used (after server-side normalisation). |
-| `no_history_variant` | recursive `AgentGatewayResponse` | Present only when `compare_with_no_history=true`. Holds the parallel run produced without silent retrieval. |
+| `no_history_variant` | recursive `AgentGatewayResponse` | Present only when `compare_with_no_history=true` in the API request (eval / research use). The Behavioral Intelligence Hub does not request this field. |
 
 ### Example — unified gateway (recommended)
 
@@ -248,13 +244,11 @@ curl -X POST "http://localhost:8000/api/agent/v1" \
       "language": "pidgin"
     },
     "query": "Review for Iya Eba Amala Spot. Saturday lunch with a friend; amala was soft, egusi rich, 20 min wait, paid about 2k each.",
-    "top_k": 4,
-    "include_history": true,
-    "compare_with_no_history": true
+    "top_k": 4
   }'
 ```
 
-The response includes `task`, `routing_source` (`llm` or `heuristic`), `review`/`recommendation`, `safety_flags`, `timing_ms`, `language`, an optional `no_history_variant` carrying the parallel control run, and a `reasoning_steps` array including any critique-pass note.
+The response includes `task`, `routing_source` (`llm` or `heuristic`), `review`/`recommendation`, `safety_flags`, `timing_ms`, `language`, and a `reasoning_steps` array including any critique-pass note.
 
 ### Example — streaming gateway (live reasoning)
 
@@ -417,7 +411,6 @@ pytest -q
 - ✅ Ablation runner (no-RAG / no-critique / no-LLM) with real numbers
 - ✅ Behavioural-fidelity A/B harness ([`scripts/eval_fidelity.py`](scripts/eval_fidelity.py) + [`docs/EVAL.md`](docs/EVAL.md))
 - ✅ Streaming reasoning gateway (`POST /api/agent/v1/stream`) + animated live timeline UI
-- ✅ A/B compare with no-history control variant in a single request
 - ✅ Multi-language output: English · Nigerian Pidgin · English + Yoruba mix
 - ✅ Advisory safety / validation layer with `safety_flags` on every response
 - ✅ User feedback loop (thumbs up/down → JSONL log + stats endpoint)

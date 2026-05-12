@@ -365,7 +365,6 @@ export default function UnifiedAgentPage() {
   const [query, setQuery] = useState("");
   const [language, setLanguage] = useState<AgentLanguage>("english");
   const [includeHistory, setIncludeHistory] = useState(true);
-  const [compareNoHistory, setCompareNoHistory] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AgentGatewayResponse | null>(null);
@@ -449,7 +448,6 @@ export default function UnifiedAgentPage() {
           query: q,
           top_k: 5,
           include_history: includeHistory,
-          compare_with_no_history: compareNoHistory && includeHistory,
         },
         applyStreamEvent,
         { signal: controller.signal }
@@ -511,7 +509,7 @@ export default function UnifiedAgentPage() {
           ))}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs uppercase tracking-wider text-slate-500">
               Output language
@@ -532,29 +530,10 @@ export default function UnifiedAgentPage() {
             <input
               type="checkbox"
               checked={includeHistory}
-              onChange={(e) => {
-                setIncludeHistory(e.target.checked);
-                if (!e.target.checked) setCompareNoHistory(false);
-              }}
+              onChange={(e) => setIncludeHistory(e.target.checked)}
               className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500"
             />
             Use silent history (Task A baseline)
-          </label>
-          <label
-            className={`flex items-end gap-2 text-xs ${
-              includeHistory
-                ? "cursor-pointer text-slate-300"
-                : "cursor-not-allowed text-slate-600"
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={compareNoHistory}
-              disabled={!includeHistory}
-              onChange={(e) => setCompareNoHistory(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500 disabled:opacity-50"
-            />
-            Compare side-by-side with no-history variant
           </label>
         </div>
 
@@ -690,23 +669,7 @@ export default function UnifiedAgentPage() {
       )}
 
       {result && (
-        <AgentResultCard
-          result={result}
-          variantLabel={
-            result.no_history_variant ? "With history (full pipeline)" : undefined
-          }
-          userId={userId}
-          query={query}
-        />
-      )}
-
-      {result?.no_history_variant && (
-        <AgentResultCard
-          result={result.no_history_variant}
-          variantLabel="Without history (control)"
-          userId={userId}
-          query={query}
-        />
+        <AgentResultCard result={result} userId={userId} query={query} />
       )}
     </div>
   );
