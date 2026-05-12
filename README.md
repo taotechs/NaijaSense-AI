@@ -7,15 +7,24 @@ NaijaSense AI is a context-aware, multi-agent system for the **DSN × Bluechip T
 
 The system intentionally **separates a small fast router model from a strong generator model**, grounds review writing in retrieved corpus examples (RAG), and runs an optional **critique → regenerate** loop to catch generic outputs before they reach the user. Every request also runs a **silent context-retrieval step** that pulls the user's historical ratings/reviews from the normalized corpus by `user_id` *before* any LLM call, so the persona used for generation and ranking reflects real past behaviour rather than a static UI profile.
 
+![Behavioral Intelligence Hub — landing screen with backend status pill, agentic-workflow indicator, and Nigerian quick-start prompts](docs/homescreen.png)
+
+> **Live demo:** <https://naija-sense-ai.vercel.app/unified> · **API:** <https://youthful-wynn-taotechs-6715c87e.koyeb.app/api/v1/health>
+
 ---
 
 ## Why this submission
 
-- **Honest, reproducible benchmarks.** Ablation numbers in [`data/benchmark_results.json`](data/benchmark_results.json) measured on a held-out slice of Yelp + Goodreads + Amazon reviews.
-- **Transparent reasoning.** Every response carries `reasoning_steps`, including which routing path was used and whether the critique pass rewrote the output.
-- **Two-model split.** Cheap router model (Groq Llama-3.1-8B) for classification + persona inference; strong generator (Llama-3.3-70B) for writing. Cuts cost while keeping output quality high.
-- **Nigerian contextualisation.** Persona styles support both formal global English and `nigerian_twitter` (light pidgin colouring) with hard rules in the prompt to prevent forced slang.
-- **Containerised** end-to-end (FastAPI + Next.js + Chroma) with one `docker compose up`.
+- **Honest, reproducible benchmarks.** Ablation numbers in [`data/benchmark_results.json`](data/benchmark_results.json) measured on a held-out slice of Yelp + Goodreads + Amazon reviews, plus a behavioural-fidelity A/B harness ([`scripts/eval_fidelity.py`](scripts/eval_fidelity.py), [`docs/EVAL.md`](docs/EVAL.md)) that quantifies how much the silent history step moves the needle.
+- **Streaming agentic UX.** The unified gateway has a non-blocking NDJSON streaming sibling (`POST /api/agent/v1/stream`) that emits each reasoning step as it fires; the UI renders them as an animated timeline so the agent's thinking is visible in real time.
+- **Transparent reasoning.** Every response carries `reasoning_steps`, `safety_flags`, `timing_ms`, the routing path, and the critique-pass verdict — all surfaced in the UI as pills, badges, and an expandable trace.
+- **A/B behavioural fidelity, on demand.** A `compare_with_no_history` toggle runs the same query twice — once with the silent historical retrieval, once without — and returns both for side-by-side judging. Proves the differentiator on stage.
+- **Multi-language output.** A `language` field on the persona supports `english`, `pidgin`, and `yoruba_mix`, threaded into the generator prompt as a hard rule that overrides the persona-style preset.
+- **Two-model split.** Cheap router model (Groq Llama-3.1-8B) for classification + persona inference + safety critique; strong generator (Llama-3.3-70B) for writing. Cuts cost while keeping output quality high.
+- **Advisory safety layer.** Input is scanned for prompt-injection + PII shapes; output is checked for PII leakage and ungrounded numeric specifics. Findings surface as a non-blocking `safety_flags` array, never as a hard block.
+- **Feedback loop, built-in.** Thumbs-up / thumbs-down on every result writes to a JSONL log (`POST /api/agent/feedback`) so the team can audit outputs and feed the signal back as few-shot examples.
+- **Nigerian contextualisation.** Persona styles support formal global English and `nigerian_twitter` (light pidgin colouring) with hard rules in the prompt to prevent forced slang.
+- **Containerised** end-to-end (FastAPI + Next.js + Chroma) with one `docker compose up`, plus a public production deploy on **Koyeb (backend) + Vercel (frontend)**.
 
 ---
 
@@ -25,21 +34,28 @@ The system intentionally **separates a small fast router model from a strong gen
 flowchart LR
     U[User] --> FE[Behavioral Intelligence Hub<br/>Next.js /unified]
     U --> SW[Swagger /docs]
-    FE --> AGW[POST /api/agent/v1<br/>+ multi-turn buffer]
+    FE -->|POST| AGW[/api/agent/v1<br/>+ multi-turn buffer]
+    FE -->|POST NDJSON| STR[/api/agent/v1/stream<br/>live reasoning steps]
+    FE -->|POST thumbs| FB[/api/agent/feedback<br/>JSONL log]
+    FE -->|GET| HC[/api/v1/health<br/>status pill + pre-warm]
     SW --> AGW
-    AGW --> IR[Intent Router LLM small/heuristic]
+    AGW --> SAFE[Safety Layer<br/>prompt-injection / PII / ungrounded specifics]
+    STR --> SAFE
+    SAFE --> IR[Intent Router LLM small/heuristic]
     IR -->|task=review| O[Orchestrator]
     IR -->|task=recommend| O
-    O --> SCR[Silent Context Retrieval<br/>by user_id]
+    O -.optional skip.-> SCR[Silent Context Retrieval<br/>by user_id]
     SCR --> HUS[(Historical User Store<br/>corpus indexed by user_id)]
     SCR --> O
     O --> UMA[User Modeling Agent — router LLM<br/>history baseline + UI override]
-    O --> RGA[Review Generation Agent — generator LLM]
+    O --> RGA[Review Generation Agent — generator LLM<br/>english / pidgin / yoruba_mix]
     O --> RA[Recommendation Agent — deterministic hybrid scorer<br/>+ chain-of-thought trace]
     RGA --> RAG[(Review Corpus Store / RAG)]
     RGA --> CRI[Critic LLM — router model]
     O --> MEM[(User Memory / Vector Store<br/>warmed from history)]
-    O --> TRC[Reasoning Trace]
+    O --> TRC[Reasoning Trace + safety_flags + timing_ms]
+    O -.compare_with_no_history.-> VAR[Variant Pass<br/>silent retrieval skipped]
+    VAR --> TRC
 ```
 
 ### Stateful agentic workflow (silent context retrieval)
@@ -133,14 +149,25 @@ Open <http://localhost:3000> — the home route redirects to `/unified`, which i
 
 ### Using the UI
 
-The Behavioral Intelligence Hub gives the judge everything they need from one screen:
+The Behavioral Intelligence Hub gives the judge everything they need from one screen.
 
-1. **Single input field.** Placeholder: *"Simulate a review for a Nigerian spot or ask for personalized recommendations…"* — the intent router decides between Task A and Task B automatically.
+![Filling out a query and the behavioral profile in the unified hub](docs/input.png)
+
+1. **Single input field.** Placeholder: *"Simulate a review for a Nigerian spot or ask for personalized recommendations…"* — the LLM intent router decides between Task A and Task B automatically.
 2. **Quick-start chips** with Nigerian context (Ikeja suya, late-night Yaba akara/noodles, Iya Eba jollof, Abuja-on-10k). One click fills the textarea.
-3. **Behavioral profile (Task A user modeling).** A clearly labelled collapsible section with a **Quick preset** dropdown (Lagos foodie · VI lifestyle critic · Abuja professional · Campus student) plus manual fields for location, interests, sentiment bias, tone notes and history.
-4. **Agentic workflow indicator.** While a request is in flight, a teal-tinted bar appears showing the four stages: *Routing intent → Inferring persona → Generating response → Critique pass*. The indicator stays visible for a minimum of ~1.8s so the pipeline is always observable.
-5. **Routed-task pill + critique badge.** The result card flags whether the agent ran Task A or Task B, which router (LLM vs heuristic) decided it, and whether the critique→regenerate loop fired.
-6. **Agentic reasoning trace** — expandable list of every reasoning step the orchestrator logged, exposed for evaluators.
+3. **Output language selector.** Three options — *English*, *Nigerian Pidgin*, *English + Yoruba mix* — threaded into the generator as a hard prompt rule that overrides the persona-style preset.
+4. **Behavioral profile (Task A user modeling).** A clearly labelled collapsible section with a **Quick preset** dropdown (Lagos foodie · VI lifestyle critic · Abuja professional · Campus student) plus manual fields for location, interests, sentiment bias, tone notes and history.
+5. **History controls.** A *"Use silent history"* checkbox toggles the silent retrieval step on/off; a *"Compare side-by-side with no-history variant"* checkbox additionally runs a control pass with retrieval disabled and renders both results stacked — the differentiator made visible on demand.
+6. **Backend status pill.** A small pill in the page header pings `/api/v1/health` on mount (which doubles as a free-tier pre-warm) and polls every 60s. States: *checking → waking up… → ready · NNms → unreachable*.
+7. **Live agent trace.** While the request streams, an animated timeline fills in step-by-step (silent retrieval → persona strategy → build persona → generate → critique / persist). Each node has its own icon and pulses while active, so the agent's reasoning is visible rather than implied.
+
+![Result card with safety advisories, timing pill, ★ rating, generated review, thumbs feedback, and expandable reasoning trace](docs/output.png)
+
+8. **Result card** — task pill (`Task A · review` or `Task B · recommend`), routing source (`llm` vs `heuristic`), language tag, `NNms` latency, an amber `Critique applied` chip when the critique→regenerate loop fired, and the orchestrator's rationale.
+9. **Safety advisories.** Non-blocking flags from the validation layer surface as small amber chips with hover-tooltips (e.g. `prompt_injection_suspected`, `ungrounded_numeric_specifics`, `pii_phone_in_input`).
+10. **Thumbs feedback.** Every result card carries 👍 / 👎 buttons that POST to `/api/agent/feedback` and append to a JSONL log for later audit + few-shot fine-tuning fuel.
+11. **Side-by-side compare.** When the compare toggle is on, a second result card labelled *"Without history (control)"* appears under the main one so the impact of the silent retrieval step is immediately legible.
+12. **Agentic reasoning trace** — the same animated timeline, frozen on the final state, with the full numbered list of every reasoning line emitted by the orchestrator.
 
 ### Verify the stack in 30 seconds
 
@@ -181,10 +208,30 @@ If both pass, the submission is functional end-to-end.
 
 | Method | Path | What it does |
 |---|---|---|
-| `GET` | `/api/v1/health` | Liveness probe. |
+| `GET` | `/api/v1/health` | Liveness probe; doubles as a cold-start pre-warm for the frontend. |
 | `POST` | `/api/v1/simulate-review` | Task A — explicit endpoint. Body: `user_profile`, `item_data`, `persona_style`. |
 | `POST` | `/api/v1/recommend` | Task B — explicit endpoint. Body: `user_profile`, `candidate_items`, `context`, `top_k`. |
-| `POST` | `/api/agent/v1` | **Unified gateway.** Body: `user_persona`, `query`. Routes to Task A or B via the LLM intent router (with heuristic fallback). |
+| `POST` | `/api/agent/v1` | **Unified gateway.** Body: `user_persona`, `query`, `include_history?`, `compare_with_no_history?`. Routes to Task A or B via the LLM intent router (with heuristic fallback). |
+| `POST` | `/api/agent/v1/stream` | **Streaming unified gateway.** Same payload as `/v1`, returns `application/x-ndjson` — one JSON event per line (`start` → `route` → `plan` → `step_start`/`step_end` × N → `final`). Powers the live reasoning timeline. |
+| `POST` | `/api/agent/feedback` | Thumbs-up/down feedback. Appends to `data/feedback.jsonl`. |
+| `GET` | `/api/agent/feedback/stats` | Aggregate over the feedback log (total / positive / negative / positive_pct). |
+
+### New request fields on `/api/agent/v1` and `/v1/stream`
+
+| Field | Type | Purpose |
+|---|---|---|
+| `user_persona.language` | `english` \| `pidgin` \| `yoruba_mix` | Hard language rule threaded into the generator prompt. Overrides `persona_style`. |
+| `include_history` | `bool` (default `true`) | When `false`, skips the silent historical-context step. Useful for A/B isolation. |
+| `compare_with_no_history` | `bool` (default `false`) | When `true` (and `include_history=true`), runs a second pass with history disabled and attaches it as `response.no_history_variant`. |
+
+### New response fields
+
+| Field | Type | Purpose |
+|---|---|---|
+| `safety_flags` | `string[]` | Advisory advisories: `prompt_injection_suspected`, `pii_email_in_input`, `ungrounded_numeric_specifics`, etc. Never blocking. |
+| `timing_ms` | `int` | End-to-end server latency, surfaced as a UI pill. |
+| `language` | `string` | The language actually used (after server-side normalisation). |
+| `no_history_variant` | recursive `AgentGatewayResponse` | Present only when `compare_with_no_history=true`. Holds the parallel run produced without silent retrieval. |
 
 ### Example — unified gateway (recommended)
 
@@ -197,14 +244,40 @@ curl -X POST "http://localhost:8000/api/agent/v1" \
       "location": "Lagos",
       "interests": ["street food", "amala"],
       "sentiment_bias": "balanced",
-      "tone_notes": "Use Nigerian twitter tone."
+      "tone_notes": "Use Nigerian twitter tone.",
+      "language": "pidgin"
     },
     "query": "Review for Iya Eba Amala Spot. Saturday lunch with a friend; amala was soft, egusi rich, 20 min wait, paid about 2k each.",
-    "top_k": 4
+    "top_k": 4,
+    "include_history": true,
+    "compare_with_no_history": true
   }'
 ```
 
-The response includes `task`, `routing_source` (`llm` or `heuristic`), `review`/`recommendation`, and a `reasoning_steps` array including any critique-pass note.
+The response includes `task`, `routing_source` (`llm` or `heuristic`), `review`/`recommendation`, `safety_flags`, `timing_ms`, `language`, an optional `no_history_variant` carrying the parallel control run, and a `reasoning_steps` array including any critique-pass note.
+
+### Example — streaming gateway (live reasoning)
+
+```bash
+curl -N -X POST "http://localhost:8000/api/agent/v1/stream" \
+  -H "Content-Type: application/json" \
+  -d '{ "user_persona": {"user_id":"judge_demo", "language":"pidgin"},
+        "query": "Suggest cheap weekend places to eat in Yaba." }'
+```
+
+The response is `application/x-ndjson` — one JSON object per line:
+
+```jsonc
+{"type":"start","ts":1747345560123}
+{"type":"route","task":"recommend","source":"llm","rationale":"…"}
+{"type":"plan","flow":"task_b_memory_recommendation","steps":["silent_context_retrieval", "…"]}
+{"type":"step_start","flow":"task_b_memory_recommendation","step":"silent_context_retrieval"}
+{"type":"step_end","flow":"task_b_memory_recommendation","step":"silent_context_retrieval"}
+// …more step pairs…
+{"type":"final","result": { /* full AgentGatewayResponse */ }}
+```
+
+The frontend parses these line-by-line and animates the reasoning timeline in real time.
 
 ---
 
@@ -268,6 +341,27 @@ See `data/benchmark_results.json` for the full table. Highlights:
 - **Critique loop is metric-neutral on lexical scores** — by design, it targets human quality, not n-gram overlap.
 - **Task B is identical across variants** because the ranker is fully deterministic; the LLM contributes only the conversational summary. The current Hit Rate@10 of 0.2 (vs 0.5 random baseline on a same-domain candidate set) flags a clear limitation: the hybrid scorer's interest-overlap signal is too narrow when distractors share the target's domain. Future work: add an LLM-driven reranking layer.
 
+### Behavioural fidelity (A/B history harness)
+
+Quantifies how much the silent historical-context step moves the needle. For every eligible user (≥2 corpus entries) it holds out the last review and runs the agent twice — once with history, once without — then scores each generated review for rating error, TF cosine similarity, tone match, and a composite fidelity number.
+
+```bash
+# Against a locally running backend
+python scripts/eval_fidelity.py --limit 20
+
+# Against the deployed Koyeb backend
+python scripts/eval_fidelity.py \
+  --base-url https://youthful-wynn-taotechs-6715c87e.koyeb.app \
+  --limit 30
+```
+
+Outputs go to `data/eval/`:
+
+- `fidelity_results.jsonl` — per-sample raw scores for both modes.
+- `fidelity_summary.json`  — aggregate means + the `delta` between modes.
+
+Full methodology, metric definitions, and interpretation guide in [`docs/EVAL.md`](docs/EVAL.md).
+
 ### Smoke harnesses (judges can run these in under a minute)
 
 ```bash
@@ -321,6 +415,13 @@ pytest -q
 - ✅ Datasets normalisation for Yelp / Amazon / Goodreads (all represented in the eval corpus)
 - ✅ Evaluation scripts with ROUGE / BERTScore (token-F1 fallback) / RMSE / NDCG@10 / Hit Rate@10
 - ✅ Ablation runner (no-RAG / no-critique / no-LLM) with real numbers
+- ✅ Behavioural-fidelity A/B harness ([`scripts/eval_fidelity.py`](scripts/eval_fidelity.py) + [`docs/EVAL.md`](docs/EVAL.md))
+- ✅ Streaming reasoning gateway (`POST /api/agent/v1/stream`) + animated live timeline UI
+- ✅ A/B compare with no-history control variant in a single request
+- ✅ Multi-language output: English · Nigerian Pidgin · English + Yoruba mix
+- ✅ Advisory safety / validation layer with `safety_flags` on every response
+- ✅ User feedback loop (thumbs up/down → JSONL log + stats endpoint)
 - ✅ Solution paper at [`docs/SOLUTION_PAPER.md`](docs/SOLUTION_PAPER.md)
 - ✅ Reproducible Docker Compose stack
+- ✅ Public production deploy: Vercel (frontend) + Koyeb (backend)
 - ✅ Nigerian contextualisation in tone + retrieval seed data
