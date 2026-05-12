@@ -36,11 +36,12 @@ export type AgentGatewayResponse = {
 
 export async function postAgentGateway(body: AgentGatewayRequest): Promise<AgentGatewayResponse> {
   // We add "/api/agent/unified" to the base AGENT_URL to match the backend prefix
-  const response = await fetch(`${AGENT_URL}/api/agent/unified`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
+  // Replace the fetch line in your postAgentGateway function with this:
+const response = await fetch(`${AGENT_URL}/api/agent/v1`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body)
+});
 
   if (!response.ok) {
     let message = `Agent request failed (${response.status})`;
