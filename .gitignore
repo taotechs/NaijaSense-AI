@@ -12,6 +12,10 @@ venv/
 # Local Kaggle CSV downloads (use script or manual export; do not commit blobs)
 data/raw/kaggle/
 
+# Runtime-written user feedback log + eval artifacts (regenerated per run)
+data/feedback.jsonl
+data/eval/
+
 # Frontend / Next.js
 frontend/node_modules/
 frontend/.next/
