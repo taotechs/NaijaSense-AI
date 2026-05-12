@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from api.agent_routes import router as agent_router
+from api.feedback_routes import router as feedback_router
 from api.routes import router
 from utils.config import settings
 
@@ -25,6 +26,7 @@ app.add_middleware(
 
 app.include_router(router, prefix=settings.api_prefix)
 app.include_router(agent_router, prefix="/api/agent")
+app.include_router(feedback_router, prefix="/api/agent")
 
 
 @app.exception_handler(RequestValidationError)
