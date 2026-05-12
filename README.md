@@ -1,5 +1,7 @@
 # NaijaSense AI · Behavioral Intelligence Hub
 
+**Team:** TAOTECH SOLUTIONS
+
 NaijaSense AI is a context-aware, multi-agent system for the **DSN × Bluechip Tech LLM Agent Challenge (DSAS 2026)**. It tackles both competition tasks behind one unified API and a single chat UI branded as the **Behavioral Intelligence Hub**:
 
 - **Task A — User Modeling:** simulate a star rating and a written review for an unseen item, conditioned on a user persona inferred from minimal signals.
