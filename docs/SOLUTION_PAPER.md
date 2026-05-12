@@ -4,7 +4,7 @@
 
 ## Abstract
 
-We present **NaijaSense AI**, a multi-agent system that addresses both tasks in the DSAS LLM Agent Challenge: (Task A) simulating user reviews and star ratings, and (Task B) generating personalised, context-aware recommendations. The system pairs a small fast routing model with a strong generator, grounds review writing in retrieval over a normalised Yelp/Amazon/Goodreads corpus, and runs an optional **critique → regenerate** quality-control loop. We report ablations against a held-out slice of the corpus showing that the LLM is the dominant driver of review-text quality (ROUGE-1 drops 22% without it), retrieval-augmentation slightly hurts lexical-overlap scores while qualitatively improving specificity, and the critique pass is metric-neutral by design. For Task B we surface an honest limitation: when distractors share the target's domain, the deterministic hybrid scorer underperforms random — motivating LLM-driven reranking as the highest-value future-work direction. The full stack is containerised and exposed through a single unified API plus a Next.js chat surface — the **Behavioral Intelligence Hub** — that makes the agentic workflow (routing, persona inference, generation, critique) visible to evaluators in real time.
+We present **NaijaSense AI**, a multi-agent system that addresses both tasks in the DSAS LLM Agent Challenge: (Task A) simulating user reviews and star ratings, and (Task B) generating personalised, context-aware recommendations. The system pairs a small fast routing model with a strong generator, grounds review writing in retrieval over a normalised Yelp/Amazon/Goodreads corpus, and runs an optional **critique → regenerate** quality-control loop. A **stateful agentic workflow** runs a silent context-retrieval step on every request — pulling the user's historical ratings and reviews from the corpus by `user_id` before any LLM call — so the persona used for both tasks reflects real past behaviour rather than a static UI profile. We report ablations against a held-out slice of the corpus showing that the LLM is the dominant driver of review-text quality (ROUGE-1 drops 22% without it), retrieval-augmentation slightly hurts lexical-overlap scores while qualitatively improving specificity, and the critique pass is metric-neutral by design. For Task B we surface an honest limitation: when distractors share the target's domain, the deterministic hybrid scorer underperforms random — motivating LLM-driven reranking as the highest-value future-work direction. The full stack is containerised and exposed through a single unified API plus a Next.js chat surface — the **Behavioral Intelligence Hub** — that makes the agentic workflow (routing, persona inference, generation, critique) visible to evaluators in real time.
 
 ---
 
@@ -30,17 +30,20 @@ Static profile + single-prompt LLM systems fail on three fronts: they (a) produc
 flowchart LR
     U[User] --> FE[Behavioral Intelligence Hub<br/>Next.js /unified]
     U --> SW[Swagger /docs]
-    FE --> AGW[POST /api/agent/v1]
+    FE --> AGW[POST /api/agent/v1<br/>+ multi-turn buffer]
     SW --> AGW
     AGW --> IR[Intent Router\nLLM small / heuristic]
     IR -->|task=review| O[Orchestrator]
     IR -->|task=recommend| O
-    O --> UMA[User Modeling Agent\nrouter LLM]
+    O --> SCR[Silent Context Retrieval\nby user_id]
+    SCR --> HUS[(Historical User Store\ncorpus indexed by user_id)]
+    SCR --> O
+    O --> UMA[User Modeling Agent\nhistory + UI override]
     O --> RGA[Review Generation Agent\ngenerator LLM]
-    O --> RA[Recommendation Agent\ndeterministic hybrid scorer]
+    O --> RA[Recommendation Agent\nscorer + CoT trace]
     RGA --> RAG[(Review Corpus Store\nRAG)]
     RGA --> CRI[Critic LLM\nrouter model]
-    O --> MEM[(User Memory\nVector Store)]
+    O --> MEM[(User Memory\nwarmed from history)]
     O --> TRC[Reasoning Trace]
 ```
 
@@ -85,11 +88,41 @@ score = 0.5 × interest_overlap
 
 Cold-start is detected by `len(memory_hits) == 0`; cross-domain by interest-set disjointness with the candidate set. A conversational summary is generated separately by the LLM but does not influence ranking.
 
-### 2.5 Orchestrator and reasoning trace
+### 2.5 Stateful agentic workflow (silent context retrieval)
+
+The brief's behavioural-fidelity criterion (Task A) and "reason-before-acting" criterion (Task B) both require the agent to have *state* — i.e. to know things about a user that they didn't type into the input box. We meet this requirement with a single, deliberately silent step that runs on every request, before any LLM call:
+
+- **`HistoricalUserStore`** is constructed at startup from `data/processed/review_corpus.jsonl` and indexed by `user_id`. Currently 311 normalized rows across 311 known users (Yelp + Amazon + Goodreads); the same store also seeds `UserMemory` so vector retrieval downstream sees historical behaviour and not only in-session interactions.
+- On every incoming request the orchestrator runs **`_silent_context_retrieval(user_id)`**, which (a) pulls up to five past entries, (b) derives a **`HistoricalPersona`** summary (`avg_rating`, `rating_tendency`, `sentiment_bias`, `tone_signal`, `top_domains`, `inferred_interests`), (c) re-saves the history snippets into `UserMemory`, and (d) returns the result.
+- Unknown `user_id`s do not block the flow — the persona returns empty and the UI fields become the primary signal. This is logged explicitly in the reasoning trace.
+
+The retrieval is "silent" in two senses: the user never has to ask for it, and the UI does not have to send any prior history. Behaviour speaks for itself.
+
+#### 2.5.1 Default-vs-override persona merge
+
+The `UserModelingAgent` then merges the `HistoricalPersona` (baseline) with the `UserProfile` from the UI (override). The contract is:
+
+- For each persona field, if the UI value is **actively set** (non-empty for free-text, non-default for enums), it wins and the field is recorded in `merge_meta.overridden_fields`.
+- Otherwise the historical baseline wins.
+- The `merge_meta.source_per_field` map records `ui | history | inferred | ui+history | derived` for every persona field, making the merge fully auditable.
+
+#### 2.5.2 Multi-turn buffer for Task B
+
+The gateway maintains a per-`user_id` rolling 6-turn buffer in `api/deps.py`. Every incoming agent gateway call appends the current query to the buffer; when the request routes to Task B, the previous turns are threaded into `RecommendationRequest.conversation_history`. The recommendation agent uses these turns inside the scoring `query_blob` *and* surfaces a `chain_of_thought` array that names the path taken (warm vs cold start, cross-domain flag, multi-turn-aware flag, intent boosts, top-pick rationale).
+
+#### 2.5.3 Auditability
+
+Every silent-retrieval step emits a reasoning line on the response — e.g.
+
+> *Silent context: pulled 1 past review(s) for user_id=off_y_1; avg_rating=4.5 (tendency=generous); tone_signal=casual; domains=restaurant.*
+
+and the response payload exposes `persona_breakdown.historical_signal`, `persona_breakdown.history_used`, `persona_breakdown.merge_meta` (Task A) and `explainability.historical_signal`, `explainability.history_turns_used`, `explainability.chain_of_thought` (Task B). Judges can verify every claim in this paper directly from the response.
+
+### 2.6 Orchestrator and reasoning trace
 
 `NaijaSenseOrchestrator` materialises a `WorkflowPlan` for each task and pushes a structured `reasoning_steps` list into the response. Every decision (`plan_workflow`, `build_persona_from_profile`, `retrieve_relevant_user_memory`, `generate_review_with_persona_tone`, `persist_review_to_memory`, …) is also emitted via the logger for offline auditing, and the critique-pass outcome (`approved` vs `rewrote`, score) is appended as a reasoning step for the UI.
 
-### 2.6 User-facing surface — the Behavioral Intelligence Hub
+### 2.7 User-facing surface — the Behavioral Intelligence Hub
 
 The hackathon brief grades the *agentic workflow* and the *Nigerian contextualisation* as first-class properties, so the UI is treated as a design surface, not an afterthought. The Next.js page at `/unified` (`frontend/app/unified/page.tsx`) renders a single chat surface, the **Behavioral Intelligence Hub**, with five deliberate elements:
 
@@ -303,9 +336,10 @@ NaijaSense AI is a deliberately conservative engineering response to a hard prob
 
 The contributions:
 
+- A **stateful agentic workflow** with silent context retrieval by `user_id`, a `HistoricalUserStore` indexed from the normalised Yelp/Amazon/Goodreads corpus, an auditable default-vs-override persona merge, and a per-user multi-turn buffer that makes Task B genuinely conversational.
 - A **role-aware LLM wrapper** that pairs a cheap router with a strong generator, with explicit sampling and seed control for output diversity.
 - A **facts-in/prose-out review prompt** with retrieval-augmented few-shot examples and a calibrated **critique → regenerate** loop that fires only when needed.
-- A **deterministic, auditable Task B ranker** with cold-start, cross-domain, and multi-turn signals, plus an honestly reported limitation that points directly at our highest-value future work.
+- A **deterministic, auditable Task B ranker** with cold-start, cross-domain, and multi-turn signals, plus an explicit `chain_of_thought` trace on every response, plus an honestly reported limitation that points directly at our highest-value future work.
 - A **Behavioral Intelligence Hub UI** that makes the agentic workflow visible to evaluators — quick-start Nigerian prompts, a behavioural-preset selector tied to Task A user modeling, and a live four-stage agent-reasoning indicator during every request.
 - Full **reproducibility**: ablation script, smoke tests, Docker Compose stack, and `.env`-driven configuration so judges can run and modify everything without source changes.
 - **Nigerian contextualisation** that respects user opt-in — slang fires when asked for, stays away when the user wants formal English.
