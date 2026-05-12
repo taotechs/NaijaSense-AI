@@ -107,12 +107,30 @@ class UserPersonaInput(BaseModel):
         max_length=8000,
         description="Optional pasted history or profile narrative (fed into context).",
     )
+    language: Optional[str] = Field(
+        default="english",
+        description="Output language hint: english | pidgin | yoruba_mix. Defaults to english.",
+    )
 
 
 class AgentGatewayRequest(BaseModel):
     user_persona: UserPersonaInput
     query: str = Field(..., min_length=1, max_length=8000)
     top_k: int = Field(default=4, ge=1, le=20)
+    include_history: bool = Field(
+        default=True,
+        description=(
+            "When False, the orchestrator skips the silent historical-context "
+            "retrieval step. Useful for A/B comparing with-vs-without history."
+        ),
+    )
+    compare_with_no_history: bool = Field(
+        default=False,
+        description=(
+            "When True, runs the agent twice — once with history, once without — "
+            "and returns both for side-by-side comparison."
+        ),
+    )
 
 
 class AgentReviewResult(BaseModel):
@@ -135,4 +153,52 @@ class AgentGatewayResponse(BaseModel):
     review: Optional[AgentReviewResult] = None
     recommendation: Optional[AgentRecommendationResult] = None
     reasoning_steps: List[str] = Field(default_factory=list)
+    safety_flags: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Non-blocking advisories raised by the safety/validation layer. "
+            "Examples: 'prompt_injection_suspected', 'pii_in_output', "
+            "'hallucinated_specifics'."
+        ),
+    )
+    timing_ms: Optional[int] = Field(
+        default=None,
+        description="End-to-end agent latency in milliseconds (server-measured).",
+    )
+    language: str = Field(
+        default="english",
+        description="Output language actually used (english | pidgin | yoruba_mix).",
+    )
+    no_history_variant: Optional["AgentGatewayResponse"] = Field(
+        default=None,
+        description=(
+            "When compare_with_no_history=True, this carries the parallel run "
+            "produced without the silent historical-context step."
+        ),
+    )
+
+
+# Self-reference resolution for the recursive ``no_history_variant`` field.
+AgentGatewayResponse.model_rebuild()
+
+
+# --- Feedback (thumbs up/down) ---
+
+
+class FeedbackPayload(BaseModel):
+    """User feedback on a generated output (thumbs up/down + free-form note)."""
+
+    user_id: str = Field(default="anonymous", min_length=1, max_length=200)
+    task: str = Field(..., description="review | recommend")
+    rating: int = Field(..., ge=-1, le=1, description="-1 = thumbs down, 1 = thumbs up")
+    query: str = Field(..., max_length=8000)
+    output_preview: Optional[str] = Field(default=None, max_length=4000)
+    note: Optional[str] = Field(default=None, max_length=2000)
+    routing_source: Optional[str] = None
+    language: Optional[str] = None
+
+
+class FeedbackAck(BaseModel):
+    received: bool = True
+    id: str
 
