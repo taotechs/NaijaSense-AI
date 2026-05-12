@@ -5,7 +5,7 @@ NaijaSense AI is a context-aware, multi-agent system for the **DSN × Bluechip T
 - **Task A — User Modeling:** simulate a star rating and a written review for an unseen item, conditioned on a user persona inferred from minimal signals.
 - **Task B — Recommendation:** rank items for an individual user, handling cold-start, cross-domain, and multi-turn conversational queries with explicit reasoning traces.
 
-The system intentionally **separates a small fast router model from a strong generator model**, grounds review writing in retrieved corpus examples (RAG), and runs an optional **critique → regenerate** loop to catch generic outputs before they reach the user.
+The system intentionally **separates a small fast router model from a strong generator model**, grounds review writing in retrieved corpus examples (RAG), and runs an optional **critique → regenerate** loop to catch generic outputs before they reach the user. Every request also runs a **silent context-retrieval step** that pulls the user's historical ratings/reviews from the normalized corpus by `user_id` *before* any LLM call, so the persona used for generation and ranking reflects real past behaviour rather than a static UI profile.
 
 ---
 
@@ -25,38 +25,52 @@ The system intentionally **separates a small fast router model from a strong gen
 flowchart LR
     U[User] --> FE[Behavioral Intelligence Hub<br/>Next.js /unified]
     U --> SW[Swagger /docs]
-    FE --> AGW[POST /api/agent/v1]
+    FE --> AGW[POST /api/agent/v1<br/>+ multi-turn buffer]
     SW --> AGW
     AGW --> IR[Intent Router LLM small/heuristic]
     IR -->|task=review| O[Orchestrator]
     IR -->|task=recommend| O
-    O --> UMA[User Modeling Agent — router LLM]
+    O --> SCR[Silent Context Retrieval<br/>by user_id]
+    SCR --> HUS[(Historical User Store<br/>corpus indexed by user_id)]
+    SCR --> O
+    O --> UMA[User Modeling Agent — router LLM<br/>history baseline + UI override]
     O --> RGA[Review Generation Agent — generator LLM]
-    O --> RA[Recommendation Agent — deterministic hybrid scorer]
+    O --> RA[Recommendation Agent — deterministic hybrid scorer<br/>+ chain-of-thought trace]
     RGA --> RAG[(Review Corpus Store / RAG)]
     RGA --> CRI[Critic LLM — router model]
-    O --> MEM[(User Memory / Vector Store)]
+    O --> MEM[(User Memory / Vector Store<br/>warmed from history)]
     O --> TRC[Reasoning Trace]
 ```
 
+### Stateful agentic workflow (silent context retrieval)
+
+Both task flows start with the same shared step:
+
+0. **Silent context retrieval.** `HistoricalUserStore` (built at startup from `data/processed/review_corpus.jsonl`) is queried by `user_id`. Up to 5 past entries are pulled, normalised to short snippets, and pushed into `UserMemory` so downstream vector retrieval also sees historical behaviour. A `HistoricalPersona` summary (`avg_rating`, `rating_tendency`, `sentiment_bias`, `tone_signal`, `top_domains`, `inferred_interests`) is derived from the same rows. This whole step runs *before any LLM call* and never blocks the request — unknown `user_id`s fall through with an empty persona.
+
+The `UserModelingAgent` then merges this baseline with the UI-supplied persona under explicit **default-vs-override semantics**: history wins by default, UI fields override only when the user actively set them (non-empty for free-text, non-default for enums). The merge result is logged in `merge_meta.overridden_fields` and `merge_meta.source_per_field` and surfaced in the reasoning trace and on the response. Multi-turn for Task B is implemented as a per-`user_id` rolling 6-turn buffer in `api/deps.py`; the most recent prior turns are threaded into `RecommendationRequest.conversation_history` automatically.
+
 ### Task A — Review Simulation flow
 
-1. Route classifier picks `task=review`.
-2. `UserModelingAgent` infers persona (tone, bias, interests, cultural context).
-3. `ReviewCorpusStore.search()` retrieves top-3 similar examples.
+1. **Silent context retrieval** for `user_id`.
+2. `UserModelingAgent` merges historical baseline + UI overrides.
+3. `ReviewCorpusStore.search()` retrieves top-3 similar items for style grounding.
 4. `ReviewGenerationAgent` builds a structured *fact* prompt (no draft text), adds a few-shot block, a variation token, and a per-call random seed; calls the strong generator with explicit `top_p`, `presence_penalty`, `frequency_penalty`, `seed`.
 5. If `REVIEW_CRITIQUE_ENABLED=true`, the router model scores the review on specificity (1–5). Below threshold → one rewrite with the critic's issues injected as rules.
-6. Output (review + rating + reasoning steps) is stored in `UserMemory` for downstream tasks.
+6. Generated review is stored back into `UserMemory` for downstream tasks. Response includes `persona_breakdown.historical_signal`, `persona_breakdown.history_used`, and `persona_breakdown.merge_meta`.
 
 ### Task B — Recommendation flow
 
-1. Route classifier picks `task=recommend` and synthesises candidate items if the user query is open-ended.
-2. `UserMemory` retrieves prior interactions relevant to the query.
-3. `RecommendationAgent` scores each candidate with a hybrid signal:
+1. **Silent context retrieval** for `user_id`.
+2. Gateway threads the **rolling multi-turn buffer** (prior turns from this same user_id) into `conversation_history`.
+3. Chain-of-thought reasoning step: the orchestrator logs *why* this retrieval strategy was chosen (history present?, multi-turn turns count, free-text context).
+4. `UserMemory` (now warmed with both in-session and silent-historical snippets) returns relevant prior interactions.
+5. `RecommendationAgent` scores each candidate with a hybrid signal:
    - `0.5 × interest_overlap + 0.25 × memory_overlap + 0.2 × context_overlap + 0.2 × domain_alignment + base + bias`
    - Conditional boosts: spicy / budget / relax / cold-start / cross-domain.
    - Template-y items ("starter pack", "bundle") penalised when there's no contextual hook.
-4. Returns ranked recommendations + conversational summary + explainability dict.
+6. The agent emits an explicit `chain_of_thought` array in `explainability` naming the path taken (warm vs cold start, cross-domain flag, multi-turn-aware flag, active intent boosts, top pick rationale).
+7. Returns ranked recommendations + conversational summary + explainability dict with `historical_signal` + `history_turns_used`.
 
 ---
 
