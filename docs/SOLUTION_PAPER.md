@@ -1,6 +1,7 @@
 # NaijaSense AI — Solution Paper
 
-**DSN × Bluechip Tech LLM Agent Challenge · DSAS 2026**
+**DSN × Bluechip Tech LLM Agent Challenge · DSAS 2026**  
+**Team:** TAOTECH SOLUTIONS
 
 ## Abstract
 
@@ -159,7 +160,7 @@ Deliberate UI elements (numbered to match the user-flow in the screenshots above
 
 11. **Agentic reasoning trace** — the same animated timeline frozen on its final state, plus the full numbered list of every reasoning line emitted by the orchestrator.
 
-The page metadata, header banner, and footer carry the hackathon branding (*"Built for DATA & AI SUMMIT · HACKATHON 3.0 | DSN × BCT LLM Agent Challenge"*) so context is unambiguous from the first paint. The whole surface is implemented in four files (`frontend/app/layout.tsx`, `frontend/app/unified/page.tsx`, `frontend/components/BackendStatus.tsx`, `frontend/components/ReasoningTimeline.tsx`) with no new runtime dependencies, so the container build is unchanged.
+The page metadata, header banner, and footer carry the hackathon branding (*"Built for DATA & AI SUMMIT · HACKATHON 3.0 | DSN × BCT LLM Agent Challenge"*) and the team line (*"Team · TAOTECH SOLUTIONS"*) so context is unambiguous from the first paint. The whole surface is implemented in four files (`frontend/app/layout.tsx`, `frontend/app/unified/page.tsx`, `frontend/components/BackendStatus.tsx`, `frontend/components/ReasoningTimeline.tsx`) with no new runtime dependencies, so the container build is unchanged.
 
 ### 2.8 Safety / validation layer
 
