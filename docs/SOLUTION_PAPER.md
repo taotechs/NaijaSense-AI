@@ -4,7 +4,7 @@
 
 ## Abstract
 
-We present **NaijaSense AI**, a multi-agent system that addresses both tasks in the DSAS LLM Agent Challenge: (Task A) simulating user reviews and star ratings, and (Task B) generating personalised, context-aware recommendations. The system pairs a small fast routing model with a strong generator, grounds review writing in retrieval over a normalised Yelp/Amazon/Goodreads corpus, and runs an optional **critique → regenerate** quality-control loop. We report ablations against a held-out slice of the corpus showing that the LLM is the dominant driver of review-text quality (ROUGE-1 drops 22% without it), retrieval-augmentation slightly hurts lexical-overlap scores while qualitatively improving specificity, and the critique pass is metric-neutral by design. For Task B we surface an honest limitation: when distractors share the target's domain, the deterministic hybrid scorer underperforms random — motivating LLM-driven reranking as the highest-value future-work direction. The full stack is containerised, exposes a single unified API, and a Next.js chat UI.
+We present **NaijaSense AI**, a multi-agent system that addresses both tasks in the DSAS LLM Agent Challenge: (Task A) simulating user reviews and star ratings, and (Task B) generating personalised, context-aware recommendations. The system pairs a small fast routing model with a strong generator, grounds review writing in retrieval over a normalised Yelp/Amazon/Goodreads corpus, and runs an optional **critique → regenerate** quality-control loop. We report ablations against a held-out slice of the corpus showing that the LLM is the dominant driver of review-text quality (ROUGE-1 drops 22% without it), retrieval-augmentation slightly hurts lexical-overlap scores while qualitatively improving specificity, and the critique pass is metric-neutral by design. For Task B we surface an honest limitation: when distractors share the target's domain, the deterministic hybrid scorer underperforms random — motivating LLM-driven reranking as the highest-value future-work direction. The full stack is containerised and exposed through a single unified API plus a Next.js chat surface — the **Behavioral Intelligence Hub** — that makes the agentic workflow (routing, persona inference, generation, critique) visible to evaluators in real time.
 
 ---
 
@@ -28,7 +28,7 @@ Static profile + single-prompt LLM systems fail on three fronts: they (a) produc
 
 ```mermaid
 flowchart LR
-    U[User] --> FE[Next.js /unified]
+    U[User] --> FE[Behavioral Intelligence Hub<br/>Next.js /unified]
     U --> SW[Swagger /docs]
     FE --> AGW[POST /api/agent/v1]
     SW --> AGW
@@ -88,6 +88,18 @@ Cold-start is detected by `len(memory_hits) == 0`; cross-domain by interest-set 
 ### 2.5 Orchestrator and reasoning trace
 
 `NaijaSenseOrchestrator` materialises a `WorkflowPlan` for each task and pushes a structured `reasoning_steps` list into the response. Every decision (`plan_workflow`, `build_persona_from_profile`, `retrieve_relevant_user_memory`, `generate_review_with_persona_tone`, `persist_review_to_memory`, …) is also emitted via the logger for offline auditing, and the critique-pass outcome (`approved` vs `rewrote`, score) is appended as a reasoning step for the UI.
+
+### 2.6 User-facing surface — the Behavioral Intelligence Hub
+
+The hackathon brief grades the *agentic workflow* and the *Nigerian contextualisation* as first-class properties, so the UI is treated as a design surface, not an afterthought. The Next.js page at `/unified` (`frontend/app/unified/page.tsx`) renders a single chat surface, the **Behavioral Intelligence Hub**, with five deliberate elements:
+
+1. **Single input field** with a dual-task placeholder (*"Simulate a review for a Nigerian spot or ask for personalized recommendations…"*) — the LLM intent router (Section 2.2) decides between Task A and Task B; the user never has to.
+2. **Four Nigerian quick-start chips** (Ikeja suya, a late-night Yaba akara/noodles recommend prompt with explicit time + location, Iya Eba jollof, Abuja-on-10k) pre-fill the textarea so a judge can trigger a realistic local-context flow in one click.
+3. **Behavioral profile collapsible (Task A user modeling)** with a **Quick preset** dropdown (`Lagos foodie (Naija tone)`, `VI lifestyle critic`, `Abuja professional`, `Campus student`) plus manual fields for location, interests, sentiment bias, tone notes and history. Selecting a preset rewires every field, which lets evaluators stress-test how the same query is interpreted under different behavioural personas — directly exercising the Task A user-modeling axis.
+4. **Agentic workflow indicator.** While the request is in flight, a teal-tinted bar appears below the form, cycling a filled-dot highlight across the four pipeline stages: *Routing intent → Inferring persona → Generating response → Critique pass*. A minimum 1.8s visible window ensures the indicator is always observable even when Groq responds in under a second; this makes the system's agentic structure visible rather than merely architectural.
+5. **Routed-task pill + critique badge.** The result card surfaces a `Task A · review` or `Task B · recommend` pill, the routing source (`llm` vs `heuristic`), an amber `Critique applied` chip when the critique→regenerate loop fires, and an expandable *Agentic reasoning trace* listing every reasoning step emitted by the orchestrator.
+
+The page metadata, header banner, and footer carry the hackathon branding (*"Built for DATA & AI SUMMIT · HACKATHON 3.0 | DSN × BCT LLM Agent Challenge"*) so context is unambiguous from the first paint. The whole surface is implemented in two files (`frontend/app/layout.tsx` and `frontend/app/unified/page.tsx`) with no new runtime dependencies, so the container build is unchanged.
 
 ---
 
@@ -267,10 +279,10 @@ starts the API on `:8000`, the Next.js UI on `:3000`, and Chroma on `:18000`. Al
 
 ### Entry points
 
-- API root: `http://localhost:8000`
+- API root: `http://localhost:8000` (health probe at `/api/v1/health`)
 - Swagger docs: `http://localhost:8000/docs`
-- Unified UI: `http://localhost:3000`
-- Smoke harnesses: `python scripts/smoke_critique.py`, `python scripts/smoke_api.py`
+- **Behavioral Intelligence Hub (UI):** `http://localhost:3000` — `/` redirects to `/unified`
+- Smoke harnesses: `python scripts/smoke_critique.py` (critique-pass calibration) and `python scripts/smoke_api.py http://127.0.0.1:8000` (end-to-end HTTP smoke covering review, recommend and vague-context-rewrite scenarios)
 
 ---
 
@@ -294,6 +306,7 @@ The contributions:
 - A **role-aware LLM wrapper** that pairs a cheap router with a strong generator, with explicit sampling and seed control for output diversity.
 - A **facts-in/prose-out review prompt** with retrieval-augmented few-shot examples and a calibrated **critique → regenerate** loop that fires only when needed.
 - A **deterministic, auditable Task B ranker** with cold-start, cross-domain, and multi-turn signals, plus an honestly reported limitation that points directly at our highest-value future work.
+- A **Behavioral Intelligence Hub UI** that makes the agentic workflow visible to evaluators — quick-start Nigerian prompts, a behavioural-preset selector tied to Task A user modeling, and a live four-stage agent-reasoning indicator during every request.
 - Full **reproducibility**: ablation script, smoke tests, Docker Compose stack, and `.env`-driven configuration so judges can run and modify everything without source changes.
 - **Nigerian contextualisation** that respects user opt-in — slang fires when asked for, stays away when the user wants formal English.
 
