@@ -1,6 +1,14 @@
-const AGENT_URL =
-  process.env.NEXT_PUBLIC_AGENT_API_URL ?? "http://127.0.0.1:8000/api/agent/v1";
+/**
+ * NaijaSense AI - Frontend API Client
+ * This handles the bridge to the Behavioral Intelligence Hub (FastAPI backend)
+ */
 
+// 1. Base Configuration
+// We keep the URL as the base domain only to avoid double-pathing errors.
+const AGENT_URL =
+  process.env.NEXT_PUBLIC_AGENT_API_URL || "http://127.0.0.1:8000";
+
+// 2. Type Definitions
 export type UserPersonaPayload = {
   user_id: string;
   location?: string;
@@ -26,7 +34,11 @@ export type AgentGatewayResponse = {
     persona_breakdown: Record<string, unknown>;
   };
   recommendation?: {
-    recommendations: Array<{ item_name: string; score: number; explanation: string }>;
+    recommendations: Array<{ 
+      item_name: string; 
+      score: number; 
+      explanation: string 
+    }>;
     conversational_response?: string;
     explainability?: Record<string, unknown>;
     memory_retrieved?: string[];
@@ -34,28 +46,41 @@ export type AgentGatewayResponse = {
   reasoning_steps: string[];
 };
 
-export async function postAgentGateway(body: AgentGatewayRequest): Promise<AgentGatewayResponse> {
-  // We add "/api/agent/unified" to the base AGENT_URL to match the backend prefix
-  // Replace the fetch line in your postAgentGateway function with this:
-const response = await fetch(`${AGENT_URL}/api/agent/v1`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(body)
-});
+// 3. The Unified Gateway Function
+export async function postAgentGateway(
+  body: AgentGatewayRequest
+): Promise<AgentGatewayResponse> {
+  
+  // The fetch call precisely targets the "/api/agent/v1" endpoint defined in agent_routes.py
+  // Note: We use a template literal to combine the base URL and the fixed path.
+  const response = await fetch(`${AGENT_URL}/api/agent/v1`, {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json" 
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!response.ok) {
     let message = `Agent request failed (${response.status})`;
     try {
       const err = (await response.json()) as { detail?: unknown };
-      if (typeof err.detail === "string") message = err.detail;
-      else if (err.detail && typeof err.detail === "object" && "detail" in err.detail) {
+      
+      // Handle standard FastAPI error strings or detail objects
+      if (typeof err.detail === "string") {
+        message = err.detail;
+      } else if (
+        err.detail && 
+        typeof err.detail === "object" && 
+        "detail" in err.detail
+      ) {
         message = String((err.detail as { detail?: string }).detail ?? message);
       }
     } catch {
-      /* ignore */
+      /* ignore parsing errors and use fallback message */
     }
     throw new Error(message);
   }
+
   return (await response.json()) as AgentGatewayResponse;
-  }
-  
+      }
