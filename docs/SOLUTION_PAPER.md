@@ -4,7 +4,7 @@
 
 ## Abstract
 
-We present **NaijaSense AI**, a multi-agent system that addresses both tasks in the DSAS LLM Agent Challenge: (Task A) simulating user reviews and star ratings, and (Task B) generating personalised, context-aware recommendations. The system pairs a small fast routing model with a strong generator, grounds review writing in retrieval over a normalised Yelp/Amazon/Goodreads corpus, and runs an optional **critique → regenerate** quality-control loop. A **stateful agentic workflow** runs a silent context-retrieval step on every request — pulling the user's historical ratings and reviews from the corpus by `user_id` before any LLM call — so the persona used for both tasks reflects real past behaviour rather than a static UI profile. We report ablations against a held-out slice of the corpus showing that the LLM is the dominant driver of review-text quality (ROUGE-1 drops 22% without it), retrieval-augmentation slightly hurts lexical-overlap scores while qualitatively improving specificity, and the critique pass is metric-neutral by design. For Task B we surface an honest limitation: when distractors share the target's domain, the deterministic hybrid scorer underperforms random — motivating LLM-driven reranking as the highest-value future-work direction. The full stack is containerised and exposed through a single unified API plus a Next.js chat surface — the **Behavioral Intelligence Hub** — that makes the agentic workflow (routing, persona inference, generation, critique) visible to evaluators in real time.
+We present **NaijaSense AI**, a multi-agent system that addresses both tasks in the DSAS LLM Agent Challenge: (Task A) simulating user reviews and star ratings, and (Task B) generating personalised, context-aware recommendations. The system pairs a small fast routing model with a strong generator, grounds review writing in retrieval over a normalised Yelp/Amazon/Goodreads corpus, and runs an optional **critique → regenerate** quality-control loop. A **stateful agentic workflow** runs a silent context-retrieval step on every request — pulling the user's historical ratings and reviews from the corpus by `user_id` before any LLM call — so the persona used for both tasks reflects real past behaviour rather than a static UI profile. On top of this core we ship three production-grade features that make the agent demonstrable rather than merely architectural: **(1)** an NDJSON-streaming sibling endpoint (`/api/agent/v1/stream`) that emits each reasoning step as it fires, driving an animated live timeline in the UI; **(2)** a single-request **A/B comparison mode** (`compare_with_no_history`) that runs the same query with and without the silent retrieval step and returns both for side-by-side judging — making the behavioural-fidelity differentiator legible at a glance; and **(3)** an **advisory safety layer** that surfaces prompt-injection signals, PII shapes, and ungrounded numeric specifics as a non-blocking `safety_flags` array, alongside an explicit `language` toggle (English / Nigerian Pidgin / English+Yoruba mix), a `timing_ms` server-measured latency, and a `POST /api/agent/feedback` thumbs endpoint that writes to a JSONL audit log. We report ablations against a held-out slice of the corpus showing that the LLM is the dominant driver of review-text quality (ROUGE-1 drops 22% without it), retrieval-augmentation slightly hurts lexical-overlap scores while qualitatively improving specificity, and the critique pass is metric-neutral by design. A new **behavioural-fidelity A/B harness** (`scripts/eval_fidelity.py`) quantifies the silent-retrieval delta directly. For Task B we surface an honest limitation: when distractors share the target's domain, the deterministic hybrid scorer underperforms random — motivating LLM-driven reranking as the highest-value future-work direction. The full stack is containerised and live in production on **Koyeb (backend) + Vercel (frontend)** behind a single unified gateway plus the **Behavioral Intelligence Hub** Next.js surface.
 
 ---
 
@@ -30,21 +30,28 @@ Static profile + single-prompt LLM systems fail on three fronts: they (a) produc
 flowchart LR
     U[User] --> FE[Behavioral Intelligence Hub<br/>Next.js /unified]
     U --> SW[Swagger /docs]
-    FE --> AGW[POST /api/agent/v1<br/>+ multi-turn buffer]
+    FE -->|POST| AGW[/api/agent/v1<br/>+ multi-turn buffer]
+    FE -->|POST NDJSON stream| STR[/api/agent/v1/stream<br/>live reasoning events]
+    FE -->|POST thumbs| FB[/api/agent/feedback<br/>JSONL audit log]
+    FE -->|GET on mount + every 60s| HC[/api/v1/health<br/>status pill + pre-warm]
     SW --> AGW
-    AGW --> IR[Intent Router\nLLM small / heuristic]
+    AGW --> SAFE[Safety Layer<br/>prompt-injection · PII · ungrounded specifics]
+    STR --> SAFE
+    SAFE --> IR[Intent Router\nLLM small / heuristic]
     IR -->|task=review| O[Orchestrator]
     IR -->|task=recommend| O
-    O --> SCR[Silent Context Retrieval\nby user_id]
+    O -.optional skip.-> SCR[Silent Context Retrieval\nby user_id]
     SCR --> HUS[(Historical User Store\ncorpus indexed by user_id)]
     SCR --> O
     O --> UMA[User Modeling Agent\nhistory + UI override]
-    O --> RGA[Review Generation Agent\ngenerator LLM]
+    O --> RGA[Review Generation Agent\ngenerator LLM\nenglish / pidgin / yoruba_mix]
     O --> RA[Recommendation Agent\nscorer + CoT trace]
     RGA --> RAG[(Review Corpus Store\nRAG)]
     RGA --> CRI[Critic LLM\nrouter model]
     O --> MEM[(User Memory\nwarmed from history)]
-    O --> TRC[Reasoning Trace]
+    O --> TRC[Reasoning Trace + safety_flags + timing_ms]
+    O -.compare_with_no_history.-> VAR[Variant Pass\nsilent retrieval skipped]
+    VAR --> TRC
 ```
 
 ### 2.1 Role-aware LLM wrapper
@@ -124,15 +131,73 @@ and the response payload exposes `persona_breakdown.historical_signal`, `persona
 
 ### 2.7 User-facing surface — the Behavioral Intelligence Hub
 
-The hackathon brief grades the *agentic workflow* and the *Nigerian contextualisation* as first-class properties, so the UI is treated as a design surface, not an afterthought. The Next.js page at `/unified` (`frontend/app/unified/page.tsx`) renders a single chat surface, the **Behavioral Intelligence Hub**, with five deliberate elements:
+The hackathon brief grades the *agentic workflow* and the *Nigerian contextualisation* as first-class properties, so the UI is treated as a design surface, not an afterthought. The Next.js page at `/unified` (`frontend/app/unified/page.tsx`) renders a single chat surface, the **Behavioral Intelligence Hub**.
+
+![Landing screen: backend-status pill, dual-task input, quick-start chips, language selector, history controls](homescreen.png)
+
+Deliberate UI elements (numbered to match the user-flow in the screenshots above and below):
 
 1. **Single input field** with a dual-task placeholder (*"Simulate a review for a Nigerian spot or ask for personalized recommendations…"*) — the LLM intent router (Section 2.2) decides between Task A and Task B; the user never has to.
 2. **Four Nigerian quick-start chips** (Ikeja suya, a late-night Yaba akara/noodles recommend prompt with explicit time + location, Iya Eba jollof, Abuja-on-10k) pre-fill the textarea so a judge can trigger a realistic local-context flow in one click.
-3. **Behavioral profile collapsible (Task A user modeling)** with a **Quick preset** dropdown (`Lagos foodie (Naija tone)`, `VI lifestyle critic`, `Abuja professional`, `Campus student`) plus manual fields for location, interests, sentiment bias, tone notes and history. Selecting a preset rewires every field, which lets evaluators stress-test how the same query is interpreted under different behavioural personas — directly exercising the Task A user-modeling axis.
-4. **Agentic workflow indicator.** While the request is in flight, a teal-tinted bar appears below the form, cycling a filled-dot highlight across the four pipeline stages: *Routing intent → Inferring persona → Generating response → Critique pass*. A minimum 1.8s visible window ensures the indicator is always observable even when Groq responds in under a second; this makes the system's agentic structure visible rather than merely architectural.
-5. **Routed-task pill + critique badge.** The result card surfaces a `Task A · review` or `Task B · recommend` pill, the routing source (`llm` vs `heuristic`), an amber `Critique applied` chip when the critique→regenerate loop fires, and an expandable *Agentic reasoning trace* listing every reasoning step emitted by the orchestrator.
+3. **Output language selector** with three options — *English*, *Nigerian Pidgin*, *English + Yoruba mix* — that flows through to a hard prompt rule (Section 2.10) and overrides the persona-style preset for cases where a judge explicitly wants to test the local-language register.
+4. **Behavioral profile collapsible (Task A user modeling)** with a **Quick preset** dropdown (`Lagos foodie (Naija tone)`, `VI lifestyle critic`, `Abuja professional`, `Campus student`) plus manual fields for location, interests, sentiment bias, tone notes and history. Selecting a preset rewires every field, which lets evaluators stress-test how the same query is interpreted under different behavioural personas — directly exercising the Task A user-modeling axis.
+5. **History controls.** Two checkboxes: *"Use silent history (Task A baseline)"* toggles the silent retrieval step on/off; *"Compare side-by-side with no-history variant"* additionally fires the parallel control pass described in Section 2.5. The differentiator is no longer claimed; it's interactive on stage.
+6. **Backend status pill.** A small four-state pill in the page header (`checking → waking up… → ready · NNms → unreachable`) pings `/api/v1/health` on mount, which doubles as a cold-start pre-warm for free-tier hosts (Koyeb spins down after ~15 min idle). Polls every 60s.
 
-The page metadata, header banner, and footer carry the hackathon branding (*"Built for DATA & AI SUMMIT · HACKATHON 3.0 | DSN × BCT LLM Agent Challenge"*) so context is unambiguous from the first paint. The whole surface is implemented in two files (`frontend/app/layout.tsx` and `frontend/app/unified/page.tsx`) with no new runtime dependencies, so the container build is unchanged.
+![Form interaction: query typed, language set to Pidgin, behavioral preset chosen, side-by-side compare toggled](input.png)
+
+7. **Live agent trace.** While the streaming gateway is open (Section 2.9), an animated timeline below the form fills in step-by-step. Each node has its own SVG icon (search · brain · user · pen · save · rank · check), pulses while active, and turns emerald-green when complete. The user *watches* the agent think; the agentic structure is visible rather than merely architectural.
+8. **Routed-task pill, language tag, latency, critique badge.** The result card surfaces a `Task A · review` or `Task B · recommend` pill, the routing source (`llm` vs `heuristic`), the language actually used, the server-measured `NNms` latency, an amber `Critique applied` chip when the critique→regenerate loop fired, and the orchestrator's one-line rationale.
+9. **Safety advisories.** Non-blocking flags from the validation layer (Section 2.8) render as small amber chips beneath the task pill with hover-tooltip plain-English explanations.
+10. **Thumbs feedback.** Every result card carries 👍 / 👎 buttons that fire `POST /api/agent/feedback` and append to the JSONL audit log.
+
+![Result card: task pill, language tag, timing, ★ rating, generated review, thumbs feedback, expandable reasoning trace](output.png)
+
+11. **Side-by-side compare.** When the compare toggle is on, a second result card labelled *"Without history (control)"* renders below the main one so the impact of the silent retrieval step is immediately legible — fewer corpus-grounded specifics, often a different rating, sometimes a different tone bucket.
+12. **Agentic reasoning trace** — the same animated timeline frozen on its final state, plus the full numbered list of every reasoning line emitted by the orchestrator.
+
+The page metadata, header banner, and footer carry the hackathon branding (*"Built for DATA & AI SUMMIT · HACKATHON 3.0 | DSN × BCT LLM Agent Challenge"*) so context is unambiguous from the first paint. The whole surface is implemented in four files (`frontend/app/layout.tsx`, `frontend/app/unified/page.tsx`, `frontend/components/BackendStatus.tsx`, `frontend/components/ReasoningTimeline.tsx`) with no new runtime dependencies, so the container build is unchanged.
+
+### 2.8 Safety / validation layer
+
+Three categories of failure are most relevant for a hackathon-stage LLM product: prompt-injection from a savvy judge, PII bleed-through from copy-pasted user histories, and **ungrounded numeric specifics** — the model inventing a price, a wait time, or a rating that has no anchor in the input. We catch all three with a single stdlib-only module (`core/safety.py`) wired into the gateway *both before and after* the LLM call.
+
+**Input checks** run before the intent router and scan the user-controlled fields (`query`, `tone_notes`, `history`) for:
+
+- The classic `ignore previous instructions` / `you are now a different assistant` / `print your system prompt` family of injection patterns.
+- Fenced ``` system blocks and `DAN`-style jailbreak hooks.
+- Unambiguous PII shapes (emails, Nigerian phone numbers, BVN tokens).
+
+**Output checks** run after the orchestrator returns and inspect the generated review or recommendation explanations for:
+
+- Identical PII shapes in the output that *didn't* appear in the input (a stricter check than the input pass).
+- **Ungrounded numeric facts.** Every money / percentage / time / weight token in the output is compared against the input blob (`query` + `item_context`). When ≥2 numeric tokens have no anchor in the input we raise the `ungrounded_numeric_specifics` flag.
+
+The findings surface as a non-blocking `safety_flags: string[]` array on every response. We deliberately never block — judges should always get an answer — and the UI translates flags to plain English ("Output contains numeric facts not present in the input — verify before sharing."). The whole layer is stdlib-only, so it adds zero cold-start cost.
+
+### 2.9 Streaming UX and live reasoning timeline
+
+The non-streaming gateway (`POST /api/agent/v1`) returns the final response in one shot — fine for evaluations, poor for human demos where 4-8 seconds of dead air is the difference between *"agentic system"* and *"slow website"*. We added a streaming sibling (`POST /api/agent/v1/stream`) that returns `application/x-ndjson` — one JSON event per line — so the UI can render reasoning progress incrementally.
+
+Implementation:
+
+- The orchestrator's `simulate_review` and `recommend` methods accept an optional `on_step: Callable[[Dict[str, Any]], None]` kwarg. Every step boundary fires `on_step({type: 'step_start' | 'step_end', flow, step})`.
+- The streaming route bridges this synchronous callback to an `asyncio.Queue` via `loop.call_soon_threadsafe`, runs the agent in `asyncio.to_thread`, and yields one line per queue entry. The first yielded line is a `{type: 'start'}` heartbeat (kills intermediary timeouts on cold start), and the last is `{type: 'final', result: AgentGatewayResponse}` carrying the same body the non-streaming endpoint returns.
+- The frontend uses `fetch` + `ReadableStream` (not `EventSource`, since SSE is GET-only and our payload is non-trivial JSON), splits on `\n`, and dispatches each event into an `applyStreamEvent` reducer that mutates the visible `TimelineNode[]`.
+
+The result: the user sees *"Silent context retrieval"* light up, then *"Build persona from profile + history"*, etc., as the agent works. On Pidgin runs the timeline often finishes before Groq has returned the final tokens, so the perceived latency is roughly the time-to-first-byte rather than the time-to-final-token.
+
+### 2.10 Multi-language output
+
+The brief grades **Nigerian contextualisation** as a first-class signal. The earlier release covered this via the `persona_style="nigerian_twitter"` knob, which softly biased the prompt toward pidgin colour. That was insufficient when a judge wants to *explicitly* test the agent's local-language register — pidgin colouring is opt-in by tone notes and can be overridden silently by the LLM router.
+
+We added an explicit `user_persona.language` field with three values:
+
+- `english` — clear neutral global English (the default; preserves the current behaviour exactly).
+- `pidgin` — primary Nigerian Pidgin English, with the prompt instructing the model to *"use natural pidgin constructions (e.g. 'I no go lie', 'e dey sweet die', 'na vibes') and mix in standard English only where pidgin would obscure meaning."*
+- `yoruba_mix` — English-structured sentences with natural Yoruba words and phrases sprinkled in (e.g. *omo*, *jare*, *gan-an*, *gbono feli feli*). Sentence structure stays English so non-Yoruba speakers can still follow.
+
+The language rule sits *above* the persona-style rule in the prompt's hierarchy: when both fire, language wins. End-to-end smoke tests showed the model produces authentic pidgin output ("Suya wey I buy for Yaba dey sweet die, e get smoky flavor wey I like well, and the pepper dey just right") rather than the awkward "translated" pidgin that comes from a generic system prompt.
 
 ---
 
@@ -287,6 +352,19 @@ Three different angles (portion vs service vs ambience), all grounded in the use
 - **Ranking:** NDCG@10 and Hit Rate@10 on a 20-item candidate pool with same-domain distractors. This is harder than the trivial random-pool variant where every variant scored 1.0 — we use it deliberately to expose the deterministic ranker's limits.
 - **Contextual relevance:** judges' human eval (we don't pre-empt this; we provide the reasoning trace and the conversational response to make it easy to judge).
 
+### Behavioural fidelity (silent-history A/B)
+
+The single most important claim in this paper is that silent historical-context retrieval makes generated reviews more faithful to a user's real past behaviour. We back that claim with a dedicated, reproducible harness (`scripts/eval_fidelity.py`):
+
+1. For every corpus user with ≥2 entries, hold out the **last review** as ground truth.
+2. Run the agent twice on a query derived from the held-out item — once with `include_history=true`, once with `include_history=false` — using the same `user_id`, query, and persona.
+3. Score each generated review on three axes: **rating error** (`|predicted - actual|`), **TF cosine** with the ground-truth review tokens, and **tone match** (does the generated tone bucket — slang / casual / formal — match the user's true bucket?).
+4. Combine into a composite `fidelity ∈ [0, 1]` with weights `0.4 / 0.4 / 0.2`.
+
+The harness writes per-sample raw scores (`data/eval/fidelity_results.jsonl`) and an aggregate summary (`data/eval/fidelity_summary.json`) with a `delta` block: `fidelity_with_history - fidelity_without_history`. A positive delta is the empirical proof of the silent-retrieval differentiator; the full methodology, metric definitions, and an interpretation worked example live in `docs/EVAL.md`.
+
+Because the harness issues two requests per sample, it is intentionally rate-aware — `--limit` defaults to 20 so a full run completes inside Groq's free-tier quota.
+
 ---
 
 ## 8. Reproducibility
@@ -325,8 +403,11 @@ starts the API on `:8000`, the Next.js UI on `:3000`, and Chroma on `:18000`. Al
 2. **BERTScore on Python 3.14.** Token-F1 fallback is honest but lexical; running on a Python ≤ 3.12 env restores real BERTScore.
 3. **Amazon dataset slice.** Our benchmark run had only 6 Amazon rows because the HF parquet endpoint was unreachable. The pipeline supports the full slice; rerunning when the endpoint is healthy will broaden the held-out distribution.
 4. **Rating predictor should be independent of RAG.** Section 6.1 showed that retrieved examples drag rating estimates toward corpus mean. Splitting the predictors is a small, well-defined change.
-5. **Personalisation via long-term memory.** `UserMemory` currently stores plain text interactions in an in-memory vector store. Production would back this with Chroma (already in our Compose stack) and a learned user embedding.
-6. **Human evaluation rubric.** We use a heuristic fidelity proxy; the judges' human eval will be the real signal. The reasoning steps + critique meta in every response are designed to make the eval easy.
+5. **Personalisation via long-term memory.** `UserMemory` currently stores plain text interactions in an in-memory vector store. Free-tier hosts (Koyeb) wipe this on redeploy. Production would back this with Chroma (already in our Compose stack) on a persistent disk, plus a learned user embedding.
+6. **Feedback → few-shot loop is not closed yet.** The `POST /api/agent/feedback` endpoint captures thumbs-up/down to a JSONL log, but the signal is not yet fed back into the prompt. The natural next step is a periodic job that distils high-rated outputs into a few-shot example bank inserted into the generator prompt for the same item domain.
+7. **Safety layer is heuristic.** `core/safety.py` uses regex patterns for prompt-injection and unambiguous PII shapes. It's deliberately conservative and stdlib-only to keep cold start fast, but it will miss novel jailbreak phrasings. A learned classifier (e.g. Llama-Guard-2 as a critic role) would tighten recall.
+8. **Tool-calling agent architecture.** The orchestrator is currently a linear pipeline with hooks. Rewriting it as a LangGraph agent with tools (search-corpus, get-history, summarize-persona, critique-review) would make the trace genuinely emergent and let the LLM handle queries the linear flow can't. Deferred from this submission as too high-risk during hackathon prep.
+9. **Human evaluation rubric.** We now report an automated behavioural-fidelity score (Section 7) but the judges' human eval remains the gold signal. The reasoning steps, critique meta, safety flags, and side-by-side compare in every response are designed to make the eval easy.
 
 ---
 
@@ -337,11 +418,16 @@ NaijaSense AI is a deliberately conservative engineering response to a hard prob
 The contributions:
 
 - A **stateful agentic workflow** with silent context retrieval by `user_id`, a `HistoricalUserStore` indexed from the normalised Yelp/Amazon/Goodreads corpus, an auditable default-vs-override persona merge, and a per-user multi-turn buffer that makes Task B genuinely conversational.
+- A **single-request A/B compare mode** (`compare_with_no_history`) that turns the behavioural-fidelity claim into something a judge can verify on stage in a single click.
+- A **streaming NDJSON gateway** (`/api/agent/v1/stream`) that emits each reasoning step as it fires, driving an animated **live timeline** in the UI so the agent's thinking is observable rather than merely architectural.
+- An **advisory safety / validation layer** that scans inputs for prompt-injection and PII, and outputs for PII leakage + ungrounded numeric specifics, surfacing findings as a non-blocking `safety_flags` array.
 - A **role-aware LLM wrapper** that pairs a cheap router with a strong generator, with explicit sampling and seed control for output diversity.
 - A **facts-in/prose-out review prompt** with retrieval-augmented few-shot examples and a calibrated **critique → regenerate** loop that fires only when needed.
 - A **deterministic, auditable Task B ranker** with cold-start, cross-domain, and multi-turn signals, plus an explicit `chain_of_thought` trace on every response, plus an honestly reported limitation that points directly at our highest-value future work.
-- A **Behavioral Intelligence Hub UI** that makes the agentic workflow visible to evaluators — quick-start Nigerian prompts, a behavioural-preset selector tied to Task A user modeling, and a live four-stage agent-reasoning indicator during every request.
-- Full **reproducibility**: ablation script, smoke tests, Docker Compose stack, and `.env`-driven configuration so judges can run and modify everything without source changes.
+- A **Behavioral Intelligence Hub UI** that makes the agentic workflow visible to evaluators — quick-start Nigerian prompts, a behavioural-preset selector tied to Task A user modeling, a four-state backend status pill that doubles as a free-tier pre-warm, a live reasoning timeline, thumbs feedback on every result, and a side-by-side compare card when the no-history toggle is on.
+- A **multi-language output toggle** (English / Nigerian Pidgin / English + Yoruba mix) threaded into the generator prompt as a hard rule, so judges can explicitly stress-test the local-language register.
+- A **feedback loop** (`POST /api/agent/feedback`) that captures thumbs-up/down to a JSONL audit log + a `/feedback/stats` endpoint — turning every demo session into a data-collection asset.
+- Full **reproducibility**: ablation script, behavioural-fidelity A/B harness, smoke tests, Docker Compose stack, public production deploy on Koyeb + Vercel, and `.env`-driven configuration so judges can run and modify everything without source changes.
 - **Nigerian contextualisation** that respects user opt-in — slang fires when asked for, stays away when the user wants formal English.
 
-We optimised for what the brief explicitly rewards: clarity of reasoning over raw scores, originality in the design of the critique loop and the role-split wrapper, and honest, measured limitations. The system is one `docker compose up` away from a working demo, and one `python scripts/run_real_benchmark.py --all_variants` away from reproducing every number in this paper.
+We optimised for what the brief explicitly rewards: clarity of reasoning over raw scores, originality in the design of the critique loop, the role-split wrapper, and the silent-retrieval differentiator we now measure directly, and honest, measured limitations. The system is one `docker compose up` away from a local demo, one click away from the public **<https://naija-sense-ai.vercel.app/unified>** demo, one `python scripts/run_real_benchmark.py --all_variants` away from reproducing the ablation table, and one `python scripts/eval_fidelity.py` away from reproducing the behavioural-fidelity delta.
