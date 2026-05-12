@@ -7,7 +7,9 @@ NaijaSense AI is a context-aware, multi-agent system for the **DSN × Bluechip T
 
 The system intentionally **separates a small fast router model from a strong generator model**, grounds review writing in retrieved corpus examples (RAG), and runs an optional **critique → regenerate** loop to catch generic outputs before they reach the user. Every request also runs a **silent context-retrieval step** that pulls the user's historical ratings/reviews from the normalized corpus by `user_id` *before* any LLM call, so the persona used for generation and ranking reflects real past behaviour rather than a static UI profile.
 
-![Behavioral Intelligence Hub — landing screen with backend status pill, agentic-workflow indicator, and Nigerian quick-start prompts](docs/homescreen.png)
+<p align="center">
+  <img src="docs/homescreen.png" width="380" alt="Behavioral Intelligence Hub — landing screen with quick-start chips and backend status" />
+</p>
 
 > **Live demo:** <https://naija-sense-ai.vercel.app/unified> · **API:** <https://youthful-wynn-taotechs-6715c87e.koyeb.app/api/v1/health>
 
@@ -148,7 +150,9 @@ Open <http://localhost:3000> — the home route redirects to `/unified`, which i
 
 The Behavioral Intelligence Hub gives the judge everything they need from one screen.
 
-![Filling out a query and the behavioral profile in the unified hub](docs/input.png)
+<p align="center">
+  <img src="docs/input.png" width="380" alt="Unified hub — query filled in and behavioral profile section" />
+</p>
 
 1. **Single input field.** Placeholder: *"Simulate a review for a Nigerian spot or ask for personalized recommendations…"* — the LLM intent router decides between Task A and Task B automatically.
 2. **Quick-start chips** with Nigerian context (Ikeja suya, late-night Yaba akara/noodles, Iya Eba jollof, Abuja-on-10k). One click fills the textarea.
@@ -158,7 +162,9 @@ The Behavioral Intelligence Hub gives the judge everything they need from one sc
 6. **Backend status pill.** A small pill in the page header pings `/api/v1/health` on mount (which doubles as a free-tier pre-warm) and polls every 60s. States: *checking → waking up… → ready · NNms → unreachable*.
 7. **Live agent trace.** While the request streams, an animated timeline fills in step-by-step (silent retrieval → persona strategy → build persona → generate → critique / persist). Each node has its own icon and pulses while active, so the agent's reasoning is visible rather than implied.
 
-![Result card with safety advisories, timing pill, ★ rating, generated review, thumbs feedback, and expandable reasoning trace](docs/output.png)
+<p align="center">
+  <img src="docs/output.png" width="380" alt="Unified hub — simulated review with task pill, rating, and reasoning trace" />
+</p>
 
 8. **Result card** — task pill (`Task A · review` or `Task B · recommend`), routing source (`llm` vs `heuristic`), language tag, `NNms` latency, an amber `Critique applied` chip when the critique→regenerate loop fired, and the orchestrator's rationale.
 9. **Safety advisories.** Non-blocking flags from the validation layer surface as small amber chips with hover-tooltips (e.g. `prompt_injection_suspected`, `ungrounded_numeric_specifics`, `pii_phone_in_input`).

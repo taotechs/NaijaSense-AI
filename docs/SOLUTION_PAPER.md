@@ -131,7 +131,9 @@ and the response payload exposes `persona_breakdown.historical_signal`, `persona
 
 The hackathon brief grades the *agentic workflow* and the *Nigerian contextualisation* as first-class properties, so the UI is treated as a design surface, not an afterthought. The Next.js page at `/unified` (`frontend/app/unified/page.tsx`) renders a single chat surface, the **Behavioral Intelligence Hub**.
 
-![Landing screen: backend-status pill, dual-task input, quick-start chips, language selector, history controls](homescreen.png)
+<p align="center">
+  <img src="homescreen.png" width="380" alt="Landing screen: dual-task input, quick-start chips, language selector, backend status" />
+</p>
 
 Deliberate UI elements (numbered to match the user-flow in the screenshots above and below):
 
@@ -142,14 +144,18 @@ Deliberate UI elements (numbered to match the user-flow in the screenshots above
 5. **Silent history toggle.** When checked (default), the silent corpus retrieval step from Section 2.5 runs before routing; unchecking skips that step for experimentation. The hub still shows **one** answer per submission.
 6. **Backend status pill.** A small four-state pill in the page header (`checking → waking up… → ready · NNms → unreachable`) pings `/api/v1/health` on mount, which doubles as a cold-start pre-warm for free-tier hosts (Koyeb spins down after ~15 min idle). Polls every 60s.
 
-![Form interaction: query typed, language set, behavioral profile available](input.png)
+<p align="center">
+  <img src="input.png" width="380" alt="Form: query typed, language set, behavioral profile" />
+</p>
 
 7. **Live agent trace.** While the streaming gateway is open (Section 2.9), an animated timeline below the form fills in step-by-step. Each node has its own SVG icon (search · brain · user · pen · save · rank · check), pulses while active, and turns emerald-green when complete. The user *watches* the agent think; the agentic structure is visible rather than merely architectural.
 8. **Routed-task pill, language tag, latency, critique badge.** The result card surfaces a `Task A · review` or `Task B · recommend` pill, the routing source (`llm` vs `heuristic`), the language actually used, the server-measured `NNms` latency, an amber `Critique applied` chip when the critique→regenerate loop fired, and the orchestrator's one-line rationale.
 9. **Safety advisories.** Non-blocking flags from the validation layer (Section 2.8) render as small amber chips beneath the task pill with hover-tooltip plain-English explanations.
 10. **Thumbs feedback.** Every result card carries 👍 / 👎 buttons that fire `POST /api/agent/feedback` and append to the JSONL audit log.
 
-![Result card: task pill, language tag, timing, ★ rating, generated review, thumbs feedback, expandable reasoning trace](output.png)
+<p align="center">
+  <img src="output.png" width="380" alt="Result: task pill, rating, generated review, thumbs, reasoning trace" />
+</p>
 
 11. **Agentic reasoning trace** — the same animated timeline frozen on its final state, plus the full numbered list of every reasoning line emitted by the orchestrator.
 
