@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "NaijaSense AI: Behavioral Intelligence Hub",
   description:
-    "Behavioral user modeling and contextual recommendation for the DSN \u00d7 BCT LLM Agent Challenge.",
+    "Behavioral user modeling and contextual recommendation for the DSN \u00d7 BCT LLM Agent Challenge. Team: TAOTECH SOLUTIONS.",
 };
 
 export default function RootLayout({
@@ -32,6 +32,9 @@ export default function RootLayout({
               <span className="text-brand-500">
                 DSN &times; BCT LLM Agent Challenge
               </span>
+              <span className="mt-2 block text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                Team · TAOTECH SOLUTIONS
+              </span>
             </p>
           </div>
         </header>
@@ -39,6 +42,9 @@ export default function RootLayout({
         <footer className="mx-auto max-w-4xl px-4 pb-8 text-center text-xs text-slate-600">
           User modeling (Task A) &amp; contextual recommendation (Task B), behind
           one agentic gateway.
+          <span className="mt-2 block text-slate-500">
+            Team · TAOTECH SOLUTIONS
+          </span>
         </footer>
       </body>
     </html>
