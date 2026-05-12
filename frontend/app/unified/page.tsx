@@ -1,11 +1,20 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   AgentGatewayResponse,
-  postAgentGateway,
+  AgentLanguage,
+  StreamEvent,
   UserPersonaPayload,
+  postFeedback,
+  streamAgentGateway,
 } from "@/lib/agent-api";
+import { BackendStatus } from "@/components/BackendStatus";
+import {
+  ReasoningTimeline,
+  TimelineNode,
+  buildNodesFromSteps,
+} from "@/components/ReasoningTimeline";
 
 type BehavioralPreset = {
   id: string;
@@ -58,17 +67,29 @@ const PRESETS: BehavioralPreset[] = [
 
 const EXAMPLE_PROMPTS: string[] = [
   "Review the new Suya spot in Ikeja — went on Friday, queue was long but yaji on point.",
-  "It’s 11 PM on a Saturday; where is the best place to get freshly made Akara or noodles near Yaba?",
+  "It's 11 PM on a Saturday; where is the best place to get freshly made Akara or noodles near Yaba?",
   "Review of jollof rice from Iya Eba kitchen — soft amala, rich egusi, 20 min wait.",
   "Suggest things to do in Abuja this weekend on a 10k budget.",
 ];
 
-const AGENT_STEPS = [
-  "Routing intent",
-  "Inferring persona",
-  "Generating response",
-  "Critique pass",
+const LANGUAGE_OPTIONS: Array<{ value: AgentLanguage; label: string }> = [
+  { value: "english", label: "English" },
+  { value: "pidgin", label: "Nigerian Pidgin" },
+  { value: "yoruba_mix", label: "English + Yoruba mix" },
 ];
+
+const SAFETY_FLAG_COPY: Record<string, string> = {
+  prompt_injection_suspected: "Possible prompt-injection language in input.",
+  pii_email_in_input: "Email detected in input — consider redacting.",
+  pii_phone_in_input: "Phone number detected in input — consider redacting.",
+  pii_bvn_in_input: "BVN detected in input — REDACT before resubmitting.",
+  pii_email_in_output: "Output contains an email-like token.",
+  pii_phone_in_output: "Output contains a phone-like token.",
+  pii_bvn_in_output: "Output contains a BVN-like token.",
+  ungrounded_numeric_specifics:
+    "Output contains numeric facts not present in the input — verify before sharing.",
+  compare_variant_failed: "Comparison variant failed; main result is shown.",
+};
 
 function StarRow({ rating }: { rating: number }) {
   const full = Math.round(rating);
@@ -87,47 +108,248 @@ function StarRow({ rating }: { rating: number }) {
   );
 }
 
-function AgenticWorkflowIndicator({ active }: { active: boolean }) {
-  const [step, setStep] = useState(0);
-  useEffect(() => {
-    if (!active) {
-      setStep(0);
-      return;
-    }
-    const id = setInterval(() => {
-      setStep((s) => (s + 1) % AGENT_STEPS.length);
-    }, 900);
-    return () => clearInterval(id);
-  }, [active]);
-
-  if (!active) return null;
+function SafetyFlagsRow({ flags }: { flags: string[] }) {
+  if (!flags || flags.length === 0) return null;
   return (
-    <div
-      className="flex items-center gap-3 rounded-xl border border-brand-500/40 bg-brand-500/10 px-4 py-3"
-      role="status"
-      aria-live="polite"
-    >
-      <span className="relative inline-flex h-2.5 w-2.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-500 opacity-75"></span>
-        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-500"></span>
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+      <span className="font-semibold uppercase tracking-wider text-amber-300">
+        Safety advisories
       </span>
-      <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-        <span className="font-medium text-brand-500">Agent reasoning</span>
-        {AGENT_STEPS.map((label, idx) => (
-          <span
-            key={label}
-            className={`transition-colors ${
-              idx === step
-                ? "text-slate-100"
-                : idx < step
-                ? "text-slate-400"
-                : "text-slate-600"
-            }`}
-          >
-            {idx === step ? "\u25cf" : "\u25cb"} {label}
+      {flags.map((flag) => (
+        <span
+          key={flag}
+          title={SAFETY_FLAG_COPY[flag] || flag}
+          className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5"
+        >
+          {flag.replace(/_/g, " ")}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ThumbsRow({
+  taskKey,
+  payload,
+}: {
+  taskKey: string;
+  payload: {
+    user_id: string;
+    task: "review" | "recommend";
+    query: string;
+    output_preview: string;
+    routing_source?: string;
+    language?: AgentLanguage;
+  };
+}) {
+  const [sent, setSent] = useState<null | 1 | -1>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function vote(rating: 1 | -1) {
+    if (sent === rating) return;
+    setError(null);
+    try {
+      await postFeedback({
+        user_id: payload.user_id,
+        task: payload.task,
+        rating,
+        query: payload.query,
+        output_preview: payload.output_preview.slice(0, 4000),
+        routing_source: payload.routing_source,
+        language: payload.language,
+      });
+      setSent(rating);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Feedback failed.");
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-xs text-slate-500" key={taskKey}>
+      <span>Helpful?</span>
+      <button
+        type="button"
+        onClick={() => vote(1)}
+        className={`rounded-full border px-2 py-0.5 transition ${
+          sent === 1
+            ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
+            : "border-slate-700 hover:border-emerald-500/60 hover:text-emerald-300"
+        }`}
+        aria-pressed={sent === 1}
+        aria-label="thumbs up"
+      >
+        {"\u{1F44D}"} Yes
+      </button>
+      <button
+        type="button"
+        onClick={() => vote(-1)}
+        className={`rounded-full border px-2 py-0.5 transition ${
+          sent === -1
+            ? "border-rose-500/50 bg-rose-500/15 text-rose-300"
+            : "border-slate-700 hover:border-rose-500/60 hover:text-rose-300"
+        }`}
+        aria-pressed={sent === -1}
+        aria-label="thumbs down"
+      >
+        {"\u{1F44E}"} No
+      </button>
+      {sent && <span className="text-slate-600">thanks — logged</span>}
+      {error && <span className="text-rose-400">{error}</span>}
+    </div>
+  );
+}
+
+function AgentResultCard({
+  result,
+  variantLabel,
+  userId,
+  query,
+}: {
+  result: AgentGatewayResponse;
+  variantLabel?: string;
+  userId: string;
+  query: string;
+}) {
+  const critiqueStep = result.reasoning_steps.find((s) =>
+    s.toLowerCase().includes("critique")
+  );
+  const outputPreview =
+    result.task === "review" && result.review
+      ? result.review.review_text
+      : result.task === "recommend" && result.recommendation
+      ? result.recommendation.conversational_response ||
+        result.recommendation.recommendations
+            .map((r) => `${r.item_name}: ${r.explanation}`)
+            .join(" | ")
+      : "";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm">
+        {variantLabel && (
+          <span className="rounded-full border border-slate-600 bg-slate-800/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-300">
+            {variantLabel}
           </span>
-        ))}
+        )}
+        <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-xs font-medium uppercase tracking-wider text-brand-500">
+          Task {result.task === "review" ? "A" : "B"} &middot; {result.task}
+        </span>
+        <span className="rounded-full border border-slate-700 px-2 py-0.5 text-xs text-slate-400">
+          Router: {result.routing_source}
+        </span>
+        {result.language && result.language !== "english" && (
+          <span className="rounded-full border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-xs text-purple-300">
+            Lang: {result.language}
+          </span>
+        )}
+        {typeof result.timing_ms === "number" && (
+          <span className="rounded-full border border-slate-700 px-2 py-0.5 text-xs text-slate-400">
+            {result.timing_ms}ms
+          </span>
+        )}
+        {critiqueStep && (
+          <span
+            className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300"
+            title={critiqueStep}
+          >
+            Critique applied
+          </span>
+        )}
+        <p className="basis-full text-slate-400">{result.orchestrator_rationale}</p>
       </div>
+
+      <SafetyFlagsRow flags={result.safety_flags || []} />
+
+      {result.task === "review" && result.review && (
+        <article className="glass rounded-2xl p-6">
+          <h3 className="text-lg font-semibold text-slate-100">
+            Simulated review
+          </h3>
+          <div className="mt-3">
+            <StarRow rating={result.review.rating} />
+          </div>
+          <p className="mt-4 whitespace-pre-wrap text-slate-200">
+            {result.review.review_text}
+          </p>
+          <div className="mt-4">
+            <ThumbsRow
+              taskKey={`review-${variantLabel ?? "main"}`}
+              payload={{
+                user_id: userId,
+                task: "review",
+                query,
+                output_preview: result.review.review_text,
+                routing_source: result.routing_source,
+                language: result.language,
+              }}
+            />
+          </div>
+        </article>
+      )}
+
+      {result.task === "recommend" && result.recommendation && (
+        <article className="glass rounded-2xl p-6">
+          <h3 className="text-lg font-semibold text-slate-100">
+            Recommendations
+          </h3>
+          {result.recommendation.conversational_response && (
+            <p className="mt-3 rounded-xl bg-brand-500/10 p-3 text-sm text-brand-500">
+              {result.recommendation.conversational_response}
+            </p>
+          )}
+          <ul className="mt-4 space-y-3">
+            {result.recommendation.recommendations.map((item) => (
+              <li
+                key={item.item_name}
+                className="rounded-xl bg-slate-900/80 p-4"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-slate-100">
+                    {item.item_name}
+                  </span>
+                  <span className="text-sm text-brand-500">
+                    {item.score.toFixed(2)}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-slate-400">{item.explanation}</p>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-4">
+            <ThumbsRow
+              taskKey={`recommend-${variantLabel ?? "main"}`}
+              payload={{
+                user_id: userId,
+                task: "recommend",
+                query,
+                output_preview: outputPreview,
+                routing_source: result.routing_source,
+                language: result.language,
+              }}
+            />
+          </div>
+        </article>
+      )}
+
+      <details className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm">
+        <summary className="cursor-pointer text-slate-300">
+          <span className="font-medium text-brand-500">
+            Agentic reasoning trace
+          </span>{" "}
+          <span className="text-slate-500">
+            &mdash; {result.reasoning_steps.length} step
+            {result.reasoning_steps.length === 1 ? "" : "s"}
+          </span>
+        </summary>
+        <div className="mt-3">
+          <ReasoningTimeline nodes={buildNodesFromSteps(result.reasoning_steps)} />
+          <ol className="mt-4 list-decimal space-y-1 pl-5 text-xs text-slate-500">
+            {result.reasoning_steps.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ol>
+        </div>
+      </details>
     </div>
   );
 }
@@ -141,10 +363,20 @@ export default function UnifiedAgentPage() {
   const [history, setHistory] = useState("");
   const [presetId, setPresetId] = useState<string>(PRESETS[0].id);
   const [query, setQuery] = useState("");
+  const [language, setLanguage] = useState<AgentLanguage>("english");
+  const [includeHistory, setIncludeHistory] = useState(true);
+  const [compareNoHistory, setCompareNoHistory] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showIndicator, setShowIndicator] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AgentGatewayResponse | null>(null);
+  const [liveNodes, setLiveNodes] = useState<TimelineNode[]>([]);
+
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Cleanup any in-flight stream on unmount.
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
   function applyPreset(id: string) {
     const p = PRESETS.find((x) => x.id === id);
@@ -156,15 +388,47 @@ export default function UnifiedAgentPage() {
     setToneNotes(p.tone_notes);
   }
 
+  function applyStreamEvent(ev: StreamEvent) {
+    setLiveNodes((prev) => {
+      if (ev.type === "plan") {
+        // Initialise a node per planned step (all pending).
+        return ev.steps.map((step, idx) => ({
+          id: `${step}-${idx}`,
+          step,
+          label: "pending\u2026",
+          status: "pending" as const,
+        }));
+      }
+      if (ev.type === "step_start") {
+        return prev.map((n) =>
+          n.step === ev.step && n.status !== "done"
+            ? { ...n, status: "active" as const, label: "running\u2026" }
+            : n.status === "active"
+            ? { ...n, status: "done" as const, label: "complete" }
+            : n
+        );
+      }
+      if (ev.type === "step_end") {
+        return prev.map((n) =>
+          n.step === ev.step ? { ...n, status: "done" as const, label: "complete" } : n
+        );
+      }
+      return prev;
+    });
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     const q = query.trim();
     if (!q) return;
     setLoading(true);
-    setShowIndicator(true);
     setError(null);
     setResult(null);
-    const startedAt = Date.now();
+    setLiveNodes([]);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     const persona: UserPersonaPayload = {
       user_id: userId.trim() || "naija_user_1",
       location,
@@ -175,37 +439,42 @@ export default function UnifiedAgentPage() {
       sentiment_bias: sentiment,
       tone_notes: toneNotes.trim() || undefined,
       history: history.trim() || undefined,
+      language,
     };
+
     try {
-      const res = await postAgentGateway({
-        user_persona: persona,
-        query: q,
-        top_k: 5,
-      });
+      const res = await streamAgentGateway(
+        {
+          user_persona: persona,
+          query: q,
+          top_k: 5,
+          include_history: includeHistory,
+          compare_with_no_history: compareNoHistory && includeHistory,
+        },
+        applyStreamEvent,
+        { signal: controller.signal }
+      );
       setResult(res);
+      // Make sure all timeline nodes show "done" after a successful run,
+      // even if step_end events were coalesced or skipped.
+      setLiveNodes((prev) =>
+        prev.map((n) => ({ ...n, status: "done" as const, label: "complete" }))
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed.");
     } finally {
       setLoading(false);
-      // Keep the agentic workflow indicator visible long enough for the user
-      // to actually observe the four-stage pipeline, even on fast responses.
-      const elapsed = Date.now() - startedAt;
-      const minVisibleMs = 1800;
-      if (elapsed >= minVisibleMs) {
-        setShowIndicator(false);
-      } else {
-        setTimeout(() => setShowIndicator(false), minVisibleMs - elapsed);
-      }
     }
   }
 
-  const critiqueStep = result?.reasoning_steps.find((s) =>
-    s.toLowerCase().includes("critique")
+  const activeNodeIdx = useMemo(
+    () => liveNodes.findIndex((n) => n.status === "active"),
+    [liveNodes]
   );
 
   return (
     <div className="space-y-8">
-      <section>
+      <section className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm leading-relaxed text-slate-300">
           Behavioral user modeling and contextual recommendation in one agentic
           gateway. Type any question or product experience &mdash; the system
@@ -214,6 +483,7 @@ export default function UnifiedAgentPage() {
           (recommendation), grounded in retrieval over real Yelp, Amazon, and
           Goodreads reviews.
         </p>
+        <BackendStatus />
       </section>
 
       <form onSubmit={onSubmit} className="glass space-y-4 rounded-2xl p-6">
@@ -239,6 +509,53 @@ export default function UnifiedAgentPage() {
               {ex.length > 56 ? ex.slice(0, 53) + "\u2026" : ex}
             </button>
           ))}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-xs uppercase tracking-wider text-slate-500">
+              Output language
+            </label>
+            <select
+              className="field"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as AgentLanguage)}
+            >
+              {LANGUAGE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="flex cursor-pointer items-end gap-2 text-xs text-slate-300">
+            <input
+              type="checkbox"
+              checked={includeHistory}
+              onChange={(e) => {
+                setIncludeHistory(e.target.checked);
+                if (!e.target.checked) setCompareNoHistory(false);
+              }}
+              className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500"
+            />
+            Use silent history (Task A baseline)
+          </label>
+          <label
+            className={`flex items-end gap-2 text-xs ${
+              includeHistory
+                ? "cursor-pointer text-slate-300"
+                : "cursor-not-allowed text-slate-600"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={compareNoHistory}
+              disabled={!includeHistory}
+              onChange={(e) => setCompareNoHistory(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500 disabled:opacity-50"
+            />
+            Compare side-by-side with no-history variant
+          </label>
         </div>
 
         <details className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm">
@@ -348,99 +665,48 @@ export default function UnifiedAgentPage() {
         </details>
 
         <button className="btn w-full" disabled={loading || !query.trim()}>
-          {loading ? "Routing\u2026" : "Send to agent"}
+          {loading ? "Streaming\u2026" : "Send to agent"}
         </button>
         {error && <p className="text-sm text-red-300">{error}</p>}
       </form>
 
-      <AgenticWorkflowIndicator active={showIndicator} />
+      {(loading || liveNodes.length > 0) && (
+        <div className="glass rounded-2xl p-5">
+          <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-wider text-brand-500">
+            <span>Live agent trace</span>
+            <span className="text-slate-500">
+              {activeNodeIdx >= 0
+                ? `step ${activeNodeIdx + 1} of ${liveNodes.length}`
+                : loading
+                ? "starting\u2026"
+                : "complete"}
+            </span>
+          </div>
+          <ReasoningTimeline
+            nodes={liveNodes}
+            emptyHint="Waiting for the first reasoning step\u2026"
+          />
+        </div>
+      )}
 
       {result && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm">
-            <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-xs font-medium uppercase tracking-wider text-brand-500">
-              Task {result.task === "review" ? "A" : "B"} &middot; {result.task}
-            </span>
-            <span className="rounded-full border border-slate-700 px-2 py-0.5 text-xs text-slate-400">
-              Router: {result.routing_source}
-            </span>
-            {critiqueStep && (
-              <span
-                className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300"
-                title={critiqueStep}
-              >
-                Critique applied
-              </span>
-            )}
-            <p className="basis-full text-slate-400">
-              {result.orchestrator_rationale}
-            </p>
-          </div>
+        <AgentResultCard
+          result={result}
+          variantLabel={
+            result.no_history_variant ? "With history (full pipeline)" : undefined
+          }
+          userId={userId}
+          query={query}
+        />
+      )}
 
-          {result.task === "review" && result.review && (
-            <article className="glass rounded-2xl p-6">
-              <h3 className="text-lg font-semibold text-slate-100">
-                Simulated review
-              </h3>
-              <div className="mt-3">
-                <StarRow rating={result.review.rating} />
-              </div>
-              <p className="mt-4 whitespace-pre-wrap text-slate-200">
-                {result.review.review_text}
-              </p>
-            </article>
-          )}
-
-          {result.task === "recommend" && result.recommendation && (
-            <article className="glass rounded-2xl p-6">
-              <h3 className="text-lg font-semibold text-slate-100">
-                Recommendations
-              </h3>
-              {result.recommendation.conversational_response && (
-                <p className="mt-3 rounded-xl bg-brand-500/10 p-3 text-sm text-brand-500">
-                  {result.recommendation.conversational_response}
-                </p>
-              )}
-              <ul className="mt-4 space-y-3">
-                {result.recommendation.recommendations.map((item) => (
-                  <li
-                    key={item.item_name}
-                    className="rounded-xl bg-slate-900/80 p-4"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-slate-100">
-                        {item.item_name}
-                      </span>
-                      <span className="text-sm text-brand-500">
-                        {item.score.toFixed(2)}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-400">
-                      {item.explanation}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          )}
-
-          <details className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm">
-            <summary className="cursor-pointer text-slate-300">
-              <span className="font-medium text-brand-500">
-                Agentic reasoning trace
-              </span>{" "}
-              <span className="text-slate-500">
-                &mdash; {result.reasoning_steps.length} step
-                {result.reasoning_steps.length === 1 ? "" : "s"}
-              </span>
-            </summary>
-            <ol className="mt-3 list-decimal space-y-1 pl-5 text-slate-500">
-              {result.reasoning_steps.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ol>
-          </details>
-        </div>
+      {result?.no_history_variant && (
+        <AgentResultCard
+          result={result.no_history_variant}
+          variantLabel="Without history (control)"
+          userId={userId}
+          query={query}
+        />
       )}
     </div>
   );
