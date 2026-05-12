@@ -1,0 +1,79 @@
+{
+  "corpus": "data/processed/review_corpus.jsonl",
+  "corpus_distribution": {
+    "yelp": 274,
+    "goodreads": 31,
+    "amazon": 6
+  },
+  "total_corpus_rows": 311,
+  "task_a": {
+    "sample_size": 20,
+    "split": "random stratified by gold rating, seed=7",
+    "input_protocol": "item_name only (gold review text NOT shown to the agent)",
+    "persona_style": "formal",
+    "metrics_note": "BERTScore unavailable on Python 3.14 due to torch wheel build failures; reported bertscore_f1 uses the token-F1 lexical fallback already in evaluation/metrics.py.",
+    "variants": [
+      {
+        "variant": "full",
+        "rouge1_f1": 0.16142,
+        "rouge2_f1": 0.009001,
+        "rougeL_f1": 0.104113,
+        "bertscore_f1_tokenfallback": 0.128365,
+        "rmse": 1.2506
+      },
+      {
+        "variant": "no_rag",
+        "rouge1_f1": 0.187435,
+        "rouge2_f1": 0.010615,
+        "rougeL_f1": 0.108581,
+        "bertscore_f1_tokenfallback": 0.128702,
+        "rmse": 1.002996
+      },
+      {
+        "variant": "no_critique",
+        "rouge1_f1": 0.165428,
+        "rouge2_f1": 0.006995,
+        "rougeL_f1": 0.102368,
+        "bertscore_f1_tokenfallback": 0.132258,
+        "rmse": 1.240161
+      },
+      {
+        "variant": "no_llm",
+        "rouge1_f1": 0.125767,
+        "rouge2_f1": 0.00874,
+        "rougeL_f1": 0.08591,
+        "bertscore_f1_tokenfallback": 0.123278,
+        "rmse": 1.242176
+      }
+    ]
+  },
+  "task_b": {
+    "sample_size": 25,
+    "candidate_pool_size": 20,
+    "split": "same-domain distractors (1 target + 19 random distractors from the same item_domain)",
+    "random_baseline_hit_rate_at_10": 0.5,
+    "variants": [
+      {
+        "variant": "full",
+        "ndcg@10": 0.061833,
+        "hit_rate@10": 0.2
+      },
+      {
+        "variant": "no_rag",
+        "ndcg@10": 0.061833,
+        "hit_rate@10": 0.2
+      },
+      {
+        "variant": "no_critique",
+        "ndcg@10": 0.061833,
+        "hit_rate@10": 0.2
+      },
+      {
+        "variant": "no_llm",
+        "ndcg@10": 0.061833,
+        "hit_rate@10": 0.2
+      }
+    ],
+    "note": "Task B numbers are identical across variants because the ranking path is fully deterministic; the LLM only contributes the conversational explanation. The below-random Hit Rate identifies a clear limitation: the hybrid scorer's interest-overlap signal is too narrow when distractors share the target's domain. Future work: LLM-driven reranking layer."
+  }
+}
