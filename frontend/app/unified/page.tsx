@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import Link from "next/link";
 import {
   AgentGatewayResponse,
   postAgentGateway,
@@ -25,7 +24,7 @@ export default function UnifiedAgentPage() {
   const [location, setLocation] = useState("Lagos");
   const [interests, setInterests] = useState("food, tech, books");
   const [sentiment, setSentiment] = useState("balanced");
-  const [toneNotes, setToneNotes] = useState("Warm Nigerian Twitter energy when it fits.");
+  const [toneNotes, setToneNotes] = useState("Use clear, natural English. Keep slang minimal unless requested.");
   const [history, setHistory] = useState("");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -62,53 +61,15 @@ export default function UnifiedAgentPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-brand-500">Unified agent</p>
-          <h2 className="text-2xl font-semibold text-slate-100">One chat, two brains</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Reviews and recommendations route automatically via{" "}
-            <code className="rounded bg-slate-900 px-1 text-xs">/api/agent/v1</code>. Set{" "}
-            <code className="rounded bg-slate-900 px-1 text-xs">ORCHESTRATOR_PROVIDER</code> to{" "}
-            <code className="text-xs">groq</code> or <code className="text-xs">openai</code> for LLM
-            routing.
-          </p>
-        </div>
-        <Link href="/" className="text-xs text-brand-500 hover:underline">
-          ← Home
-        </Link>
+      <div>
+        <p className="text-xs uppercase tracking-[0.2em] text-brand-500">NaijaSense AI</p>
+        <h2 className="text-2xl font-semibold text-slate-100">Single Chat Agent</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          One input like ChatGPT/Gemini. The agent auto-routes to review or recommendations.
+        </p>
       </div>
 
       <form onSubmit={onSubmit} className="glass space-y-4 rounded-2xl p-6">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <input className="field" value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="User ID" />
-          <input className="field" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" />
-        </div>
-        <input
-          className="field"
-          value={interests}
-          onChange={(e) => setInterests(e.target.value)}
-          placeholder="Interests (comma-separated)"
-        />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <select className="field" value={sentiment} onChange={(e) => setSentiment(e.target.value)}>
-            <option value="positive">Sentiment: positive</option>
-            <option value="balanced">Sentiment: balanced</option>
-            <option value="critical">Sentiment: critical</option>
-          </select>
-          <input
-            className="field"
-            value={toneNotes}
-            onChange={(e) => setToneNotes(e.target.value)}
-            placeholder="Tone / persona notes"
-          />
-        </div>
-        <textarea
-          className="field min-h-24"
-          value={history}
-          onChange={(e) => setHistory(e.target.value)}
-          placeholder="Optional: paste history, prior reviews, or profile narrative…"
-        />
         <textarea
           className="field min-h-28"
           value={query}
@@ -116,6 +77,40 @@ export default function UnifiedAgentPage() {
           placeholder="Ask anything: e.g. “Review Amala Spot — quick service, hot food.” or “What should I eat tonight in Lagos?”"
           required
         />
+        <details className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm">
+          <summary className="cursor-pointer text-slate-400">Optional persona settings</summary>
+          <div className="mt-3 grid gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input className="field" value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="User ID" />
+              <input className="field" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" />
+            </div>
+            <input
+              className="field"
+              value={interests}
+              onChange={(e) => setInterests(e.target.value)}
+              placeholder="Interests (comma-separated)"
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <select className="field" value={sentiment} onChange={(e) => setSentiment(e.target.value)}>
+                <option value="positive">Sentiment: positive</option>
+                <option value="balanced">Sentiment: balanced</option>
+                <option value="critical">Sentiment: critical</option>
+              </select>
+              <input
+                className="field"
+                value={toneNotes}
+                onChange={(e) => setToneNotes(e.target.value)}
+                placeholder="Tone / persona notes"
+              />
+            </div>
+            <textarea
+              className="field min-h-20"
+              value={history}
+              onChange={(e) => setHistory(e.target.value)}
+              placeholder="Optional: paste history or profile narrative"
+            />
+          </div>
+        </details>
         <button className="btn w-full" disabled={loading || !query.trim()}>
           {loading ? "Routing…" : "Send"}
         </button>
@@ -164,6 +159,7 @@ export default function UnifiedAgentPage() {
               </ul>
             </article>
           )}
+
 
           <details className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm">
             <summary className="cursor-pointer text-slate-400">Reasoning trace</summary>
