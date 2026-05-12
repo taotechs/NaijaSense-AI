@@ -78,6 +78,8 @@ The `UserModelingAgent` then merges this baseline with the UI-supplied persona u
 
 > Prerequisites: **Python 3.11+**, **Node.js 20+**, and (for the container path) **Docker 24+ with Docker Compose v2**. A Groq API key (free tier works) or OpenAI key is recommended — without one the app falls back to deterministic heuristics.
 
+> Going live? See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for a step-by-step Vercel (frontend) + Koyeb (backend) deploy, plus drop-in alternatives for Render, Fly.io, Hugging Face Spaces, and Railway. The repo ships with `koyeb.yaml`, `render.yaml`, and a `$PORT`-aware `Dockerfile` so the live deploy is essentially clone → connect → set env vars.
+
 ### Option A · Docker Compose (recommended for judges)
 
 Spins up the FastAPI backend, the Next.js Behavioral Intelligence Hub UI, and a Chroma vector store with one command:

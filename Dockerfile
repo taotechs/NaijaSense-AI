@@ -15,6 +15,9 @@ COPY . .
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)"
+  CMD python -c "import os, urllib.request; urllib.request.urlopen(f\"http://127.0.0.1:{os.environ.get('PORT', '8000')}/api/v1/health\", timeout=3)"
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell form so $PORT is expanded. Local docker-compose leaves PORT unset
+# (defaults to 8000); hosts like Render/Fly inject PORT and the server
+# rebinds automatically. No code change required to redeploy elsewhere.
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}

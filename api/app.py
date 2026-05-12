@@ -8,24 +8,19 @@ from fastapi.responses import JSONResponse
 from api.agent_routes import router as agent_router
 from api.routes import router
 from utils.config import settings
-from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="NaijaSense AI",
     description="Context-aware user simulation and recommendation service.",
     version="1.0.0",
 )
-origins = [
-    "https://naija-sense-ai.vercel.app",  # Your production frontend
-    "http://localhost:3000",             # For local development
-]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["*"],  # Allows GET, POST, etc.
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(router, prefix=settings.api_prefix)
@@ -54,4 +49,3 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
         status_code=exc.status_code,
         content={**detail, "path": str(request.url.path)},
     )
-

@@ -43,6 +43,16 @@ class Settings(BaseSettings):
     chroma_host: Optional[str] = None
     chroma_port: int = 8000
 
+    # Comma-separated list of origins allowed to hit the API. Local dev
+    # defaults match the Next.js dev server; in production this should be
+    # set to the deployed frontend URL (e.g. ``CORS_ORIGINS=https://your-app.vercel.app``)
+    # via the host's secret manager.
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

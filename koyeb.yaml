@@ -1,0 +1,70 @@
+# Koyeb deployment definition for the NaijaSense AI FastAPI backend.
+#
+# Koyeb supports both UI-driven and config-as-code deploys. This file
+# is the "definition" you can paste into the Koyeb dashboard
+# (App > Definition tab > paste YAML) so every redeploy is reproducible.
+#
+# Usage:
+#   1. Sign up: https://app.koyeb.com/auth/signup (GitHub login, no credit card)
+#   2. Create App > GitHub > pick this repo > Docker build > select root Dockerfile.
+#   3. App Settings > Definition > paste this file's contents.
+#   4. Variables tab > add the two secrets marked `<set in dashboard>` below.
+#   5. Deploy. Koyeb gives you a https://<app>-<org>.koyeb.app URL.
+#   6. Set CORS_ORIGINS to your Vercel URL once the frontend is deployed.
+
+name: naijasense-ai-api
+services:
+  - name: api
+    type: web
+    instance_types:
+      - type: free
+    regions:
+      - was   # Washington DC. Use `fra` for Europe.
+    git:
+      repository: github.com/<your-org>/NaijaSense-AI
+      branch: main
+      buildpack:
+        type: dockerfile
+        dockerfile: Dockerfile
+    ports:
+      - port: 8000
+        protocol: http
+    routes:
+      - path: /
+        port: 8000
+    health_checks:
+      - http:
+          path: /api/v1/health
+          port: 8000
+        grace_period: 30
+    env:
+      - key: APP_ENV
+        value: production
+      - key: API_PREFIX
+        value: /api/v1
+      - key: ORCHESTRATOR_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        value: <set in dashboard>   # Variables tab > add as secret
+      - key: GROQ_ROUTER_MODEL
+        value: llama-3.1-8b-instant
+      - key: GROQ_GENERATOR_MODEL
+        value: llama-3.3-70b-versatile
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
+      - key: GEN_TEMPERATURE
+        value: "0.85"
+      - key: GEN_TOP_P
+        value: "0.9"
+      - key: GEN_PRESENCE_PENALTY
+        value: "0.6"
+      - key: GEN_FREQUENCY_PENALTY
+        value: "0.5"
+      - key: GEN_MAX_TOKENS
+        value: "320"
+      - key: REVIEW_CRITIQUE_ENABLED
+        value: "true"
+      - key: REVIEW_CRITIQUE_THRESHOLD
+        value: "4"
+      - key: CORS_ORIGINS
+        value: <set in dashboard>   # Set to your Vercel URL after frontend deploy

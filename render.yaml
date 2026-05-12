@@ -1,0 +1,64 @@
+# Render blueprint for the NaijaSense AI FastAPI backend.
+#
+# Deploys the existing Dockerfile to Render's free web-service tier and
+# wires in the same envs the Docker Compose stack uses. The free tier
+# spins down after ~15 min of inactivity and cold-starts in 30-50s;
+# fine for hackathon judging, paid tier removes the cold start.
+#
+# Usage:
+#   1. Sign in at https://render.com with your GitHub account.
+#   2. New + > Blueprint > pick this repo > confirm.
+#   3. After the build is green, open the Environment tab and set the
+#      secret values listed in `envVars` below (GROQ_API_KEY etc.).
+#   4. Note the public URL Render assigns (e.g.
+#      https://naijasense-ai-api.onrender.com) and paste it into
+#      Vercel's NEXT_PUBLIC_AGENT_API_URL (+ /api/agent/v1).
+#   5. After the Vercel frontend is deployed, set CORS_ORIGINS here to
+#      the Vercel URL so the browser can hit the API.
+
+services:
+  - type: web
+    name: naijasense-ai-api
+    env: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: API_PREFIX
+        value: /api/v1
+      # ---- LLM provider (Groq free tier recommended) ----
+      - key: ORCHESTRATOR_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false  # set this manually in Render dashboard (it's a secret)
+      - key: GROQ_ROUTER_MODEL
+        value: llama-3.1-8b-instant
+      - key: GROQ_GENERATOR_MODEL
+        value: llama-3.3-70b-versatile
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
+      # ---- Generator sampling controls ----
+      - key: GEN_TEMPERATURE
+        value: "0.85"
+      - key: GEN_TOP_P
+        value: "0.9"
+      - key: GEN_PRESENCE_PENALTY
+        value: "0.6"
+      - key: GEN_FREQUENCY_PENALTY
+        value: "0.5"
+      - key: GEN_MAX_TOKENS
+        value: "320"
+      # ---- Critique loop ----
+      - key: REVIEW_CRITIQUE_ENABLED
+        value: "true"
+      - key: REVIEW_CRITIQUE_THRESHOLD
+        value: "4"
+      # ---- CORS: set this to the deployed Vercel URL after frontend deploy ----
+      # Example: https://naijasense-ai.vercel.app
+      - key: CORS_ORIGINS
+        sync: false
