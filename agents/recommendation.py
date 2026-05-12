@@ -75,6 +75,38 @@ class RecommendationAgent(BaseAgent):
 
         scored.sort(key=lambda x: x["score"], reverse=True)
         top_recommendations = scored[:top_k]
+        # Chain-of-thought trace: name the signals that drove the ranking so
+        # the reasoning is auditable even though the scorer is deterministic.
+        cot_trace: List[str] = []
+        if cold_start:
+            cot_trace.append("Cold-start path: no prior memory hits, leaning on context overlap.")
+        else:
+            cot_trace.append(
+                f"Warm-start path: {len(memory_hits)} memory snippet(s) shape interest priors."
+            )
+        if cross_domain:
+            cot_trace.append("Cross-domain detected: candidates disjoint from known interests.")
+        if conversation_history:
+            cot_trace.append(
+                f"Multi-turn aware: folded {len(conversation_history)} prior turn(s) into the query."
+            )
+        if wants_spicy or low_budget or wants_relax:
+            intents = ", ".join(
+                kind
+                for kind, present in (
+                    ("spicy", wants_spicy),
+                    ("budget", low_budget),
+                    ("relax", wants_relax),
+                )
+                if present
+            )
+            cot_trace.append(f"Intent boosts active: {intents}.")
+        if top_recommendations:
+            top = top_recommendations[0]
+            cot_trace.append(
+                f"Final pick: {top['item_name']} (score={top['score']}) wins on the "
+                "weighted sum above."
+            )
         explainability = {
             "personality_selected": recommender_personality,
             "scoring_formula": (
@@ -85,7 +117,11 @@ class RecommendationAgent(BaseAgent):
             "cold_start": cold_start,
             "cross_domain": cross_domain,
             "multiturn_turns_used": len(conversation_history),
-            "reasoning_summary": "Items are ranked by preference, retrieved behavior, and conversational context.",
+            "chain_of_thought": cot_trace,
+            "reasoning_summary": (
+                "Items are ranked by preference, retrieved behavior, and "
+                "conversational context. See chain_of_thought for the step-by-step trace."
+            ),
         }
         conversational_response = (
             self._build_conversational_response(top_recommendations, recommender_personality)
