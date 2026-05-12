@@ -116,6 +116,27 @@ class ReviewGenerationAgent(BaseAgent):
                 "Use clear, neutral global English. Do NOT use Nigerian slang or pidgin."
             )
 
+        # Hard language rule, threaded from the agent gateway language toggle.
+        # ``english`` keeps current behaviour. ``pidgin`` and ``yoruba_mix``
+        # request specific local registers regardless of persona_style above.
+        language = str(user_model.get("language", "english") or "english").lower().strip()
+        if language == "pidgin":
+            language_rule = (
+                "WRITE PRIMARILY IN NIGERIAN PIDGIN ENGLISH. Use natural pidgin "
+                "constructions (e.g. 'I no go lie', 'e dey sweet die', 'na vibes'). "
+                "Mix in standard English only where pidgin would obscure meaning. "
+                "This rule OVERRIDES the persona style rule above."
+            )
+        elif language == "yoruba_mix":
+            language_rule = (
+                "WRITE IN ENGLISH WITH NATURAL YORUBA WORDS / PHRASES sprinkled in "
+                "(e.g. 'omo', 'jare', 'gan-an', 'gbono feli feli'). Keep the sentence "
+                "structure English so non-Yoruba speakers can still follow. "
+                "This rule OVERRIDES the persona style rule above."
+            )
+        else:
+            language_rule = "Write in standard global English."
+
         bias_rule = {
             "positive": (
                 "Overall sentiment is positive but specific — no gushing, no hyperbole."
@@ -150,6 +171,7 @@ class ReviewGenerationAgent(BaseAgent):
             f"- Persona style: {persona_style}\n"
             f"- What the user actually said about it: {item_context or '(none provided)'}\n\n"
             "STYLE RULES\n"
+            f"- {language_rule}\n"
             f"- {style_rule}\n"
             f"- {bias_rule}\n"
             "- Be concrete: mention at least one specific detail "
