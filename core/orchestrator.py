@@ -34,9 +34,17 @@ class NaijaSenseOrchestrator:
     """Coordinates agents with dynamic planning and decision logging."""
 
     def __init__(self, user_memory: UserMemory, corpus_store: ReviewCorpusStore | None = None) -> None:
-        llm = LLMWrapper(model_name=settings.model_name)
-        self.user_modeling_agent = UserModelingAgent(llm=llm)
-        self.review_generation_agent = ReviewGenerationAgent(llm=llm)
+        # Cheap/fast model for persona inference and any classification-style calls.
+        router_llm = LLMWrapper(role="router")
+        # Strong model for review writing — higher temperature and diversity controls
+        # are applied per-call inside the agent.
+        generator_llm = LLMWrapper(role="generator")
+        self.user_modeling_agent = UserModelingAgent(llm=router_llm)
+        # Generator does the writing; router (small/fast) acts as the critic in
+        # the optional critique→regenerate loop. See ReviewGenerationAgent.
+        self.review_generation_agent = ReviewGenerationAgent(
+            llm=generator_llm, critic_llm=router_llm
+        )
         self.recommendation_agent = RecommendationAgent()
         self.user_memory = user_memory
         self.corpus_store = corpus_store
@@ -133,9 +141,24 @@ class NaijaSenseOrchestrator:
             }
         )
         reasoning_steps.append("Generated review output with persona-conditioned tone.")
+        critique_meta = review_output.get("critique_meta") or {}
+        if critique_meta.get("applied"):
+            score = critique_meta.get("specificity_score")
+            if critique_meta.get("rewritten"):
+                reasoning_steps.append(
+                    f"Critique pass rewrote the review (specificity_score={score})."
+                )
+            else:
+                reasoning_steps.append(
+                    f"Critique pass approved the review (specificity_score={score})."
+                )
         self._log_decision(
             "generate_review_with_persona_tone",
-            {"item_name": request.item_data.item_name, "rating": review_output["rating"]},
+            {
+                "item_name": request.item_data.item_name,
+                "rating": review_output["rating"],
+                "critique": critique_meta,
+            },
         )
         self._emit("after_step", {"flow": plan.flow_name, "step": plan.steps[2]})
 
