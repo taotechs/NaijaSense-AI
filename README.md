@@ -1,6 +1,6 @@
-# NaijaSense AI
+# NaijaSense AI · Behavioral Intelligence Hub
 
-NaijaSense AI is a context-aware, multi-agent system for the **DSN × Bluechip Tech LLM Agent Challenge (DSAS 2026)**. It tackles both competition tasks behind one unified API and chat UI:
+NaijaSense AI is a context-aware, multi-agent system for the **DSN × Bluechip Tech LLM Agent Challenge (DSAS 2026)**. It tackles both competition tasks behind one unified API and a single chat UI branded as the **Behavioral Intelligence Hub**:
 
 - **Task A — User Modeling:** simulate a star rating and a written review for an unseen item, conditioned on a user persona inferred from minimal signals.
 - **Task B — Recommendation:** rank items for an individual user, handling cold-start, cross-domain, and multi-turn conversational queries with explicit reasoning traces.
@@ -23,7 +23,7 @@ The system intentionally **separates a small fast router model from a strong gen
 
 ```mermaid
 flowchart LR
-    U[User] --> FE[Next.js /unified]
+    U[User] --> FE[Behavioral Intelligence Hub<br/>Next.js /unified]
     U --> SW[Swagger /docs]
     FE --> AGW[POST /api/agent/v1]
     SW --> AGW
@@ -62,35 +62,81 @@ flowchart LR
 
 ## How to run
 
-### Quickstart (local, hot-reload)
+> Prerequisites: **Python 3.11+**, **Node.js 20+**, and (for the container path) **Docker 24+ with Docker Compose v2**. A Groq API key (free tier works) or OpenAI key is recommended — without one the app falls back to deterministic heuristics.
+
+### Option A · Docker Compose (recommended for judges)
+
+Spins up the FastAPI backend, the Next.js Behavioral Intelligence Hub UI, and a Chroma vector store with one command:
 
 ```bash
-pip install -r requirements.txt
-cp .env.example .env          # then fill in GROQ_API_KEY (or OPENAI_API_KEY)
-$env:PYTHONPATH = (Get-Location).Path   # PowerShell; on bash: export PYTHONPATH=$(pwd)
-python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-In a second terminal:
-
-```bash
-cd frontend
-npm install                   # first time only
-npm run dev                   # serves http://localhost:3000
-```
-
-Open [http://localhost:3000](http://localhost:3000) — the home route redirects to `/unified`. Swagger docs are at [http://localhost:8000/docs](http://localhost:8000/docs).
-
-### Docker Compose (API + frontend + Chroma)
-
-```bash
-cp .env.example .env          # fill in GROQ_API_KEY (or OPENAI_API_KEY)
+git clone https://github.com/<your-org>/NaijaSense-AI.git
+cd NaijaSense-AI
+cp .env.example .env            # then edit and add GROQ_API_KEY (or OPENAI_API_KEY)
 docker compose up --build
 ```
 
-- **API:** [http://localhost:8000](http://localhost:8000) (`/docs` for Swagger)
-- **Frontend:** [http://localhost:3000](http://localhost:3000)
-- **Chroma:** [http://localhost:18000](http://localhost:18000)
+When the containers are healthy:
+
+| Service | URL |
+|---|---|
+| **Behavioral Intelligence Hub (UI)** | <http://localhost:3000> |
+| Swagger / OpenAPI docs | <http://localhost:8000/docs> |
+| Health probe | <http://localhost:8000/api/v1/health> |
+| Chroma vector store | <http://localhost:18000> |
+
+To stop: `docker compose down` (add `-v` to also drop the Chroma volume).
+
+### Option B · Local dev (hot-reload)
+
+Run the backend and frontend in two terminals. From the project root:
+
+```bash
+# Terminal 1 — FastAPI
+python -m venv .venv
+# Windows PowerShell:  .venv\Scripts\Activate.ps1
+# macOS / Linux:       source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env             # add GROQ_API_KEY (or OPENAI_API_KEY)
+
+# Windows PowerShell:
+$env:PYTHONPATH = (Get-Location).Path
+# macOS / Linux:
+export PYTHONPATH=$(pwd)
+
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+```bash
+# Terminal 2 — Next.js UI
+cd frontend
+npm install                       # first time only
+npm run dev                       # serves http://localhost:3000
+```
+
+Open <http://localhost:3000> — the home route redirects to `/unified`, which is the Behavioral Intelligence Hub. Swagger lives at <http://localhost:8000/docs>.
+
+### Using the UI
+
+The Behavioral Intelligence Hub gives the judge everything they need from one screen:
+
+1. **Single input field.** Placeholder: *"Simulate a review for a Nigerian spot or ask for personalized recommendations…"* — the intent router decides between Task A and Task B automatically.
+2. **Quick-start chips** with Nigerian context (Ikeja suya, late-night Yaba akara/noodles, Iya Eba jollof, Abuja-on-10k). One click fills the textarea.
+3. **Behavioral profile (Task A user modeling).** A clearly labelled collapsible section with a **Quick preset** dropdown (Lagos foodie · VI lifestyle critic · Abuja professional · Campus student) plus manual fields for location, interests, sentiment bias, tone notes and history.
+4. **Agentic workflow indicator.** While a request is in flight, a teal-tinted bar appears showing the four stages: *Routing intent → Inferring persona → Generating response → Critique pass*. The indicator stays visible for a minimum of ~1.8s so the pipeline is always observable.
+5. **Routed-task pill + critique badge.** The result card flags whether the agent ran Task A or Task B, which router (LLM vs heuristic) decided it, and whether the critique→regenerate loop fired.
+6. **Agentic reasoning trace** — expandable list of every reasoning step the orchestrator logged, exposed for evaluators.
+
+### Verify the stack in 30 seconds
+
+```bash
+# 1. Health probe (should return {"status": "ok"})
+curl http://localhost:8000/api/v1/health
+
+# 2. End-to-end smoke (review + recommend + critique scenarios)
+python scripts/smoke_api.py http://127.0.0.1:8000
+```
+
+If both pass, the submission is functional end-to-end.
 
 ---
 
