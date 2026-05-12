@@ -6,7 +6,12 @@ import re
 
 from fastapi import APIRouter, HTTPException, status
 
-from api.deps import api_logger, orchestrator
+from api.deps import (
+    api_logger,
+    get_recent_turns,
+    orchestrator,
+    record_user_turn,
+)
 from core.intent_router import route_query
 from utils.config import settings
 from utils.schemas import (
@@ -107,6 +112,12 @@ def agent_gateway(payload: AgentGatewayRequest) -> AgentGatewayResponse:
             },
         )
 
+    # Stateful agentic workflow: record this turn into the rolling
+    # conversation buffer keyed by user_id BEFORE routing. Multi-turn
+    # context is threaded into Task B via ``conversation_history`` on
+    # the recommendation request below.
+    record_user_turn(payload.user_persona.user_id, raw_query)
+
     enriched = _enriched_query(payload)
     persona_dict = payload.user_persona.model_dump()
     try:
@@ -156,6 +167,7 @@ def agent_gateway(payload: AgentGatewayRequest) -> AgentGatewayResponse:
     if len(candidates) < 1:
         candidates = ["Local experience A", "Local experience B", "Local experience C"]
     ctx = (decision.context or enriched).strip()[:1000]
+    prior_turns = get_recent_turns(payload.user_persona.user_id, exclude_latest=True)
     req = RecommendationRequest(
         user_profile=profile,
         candidate_items=candidates,
@@ -163,7 +175,7 @@ def agent_gateway(payload: AgentGatewayRequest) -> AgentGatewayResponse:
         top_k=min(payload.top_k, len(candidates)),
         recommender_personality=("nigerian_twitter" if persona_style == "nigerian_twitter" else "analyst"),
         conversational_mode=True,
-        conversation_history=[],
+        conversation_history=prior_turns,
     )
     try:
         res = orchestrator.recommend(req)
