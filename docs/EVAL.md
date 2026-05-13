@@ -57,10 +57,10 @@ Interpretation:
 - **`delta.text_cosine = +0.12`** — generated text shares meaningfully more vocabulary with the user's real review.
 - **`delta.tone_match_pct = +15.0`** — tone bucket alignment goes up 15 percentage points.
 
-The numbers above are illustrative — your run will vary depending on Groq model, sample size, and seed.
+The numbers above are illustrative; results vary by model choice, sample size, and seed.
 
 ## Caveats
 
 - The TF cosine is a lightweight stand-in for embedding similarity. For final reporting we'd swap to sentence-embedding cosine, but the relative deltas track.
 - Held-out evaluation can leak when a user's earlier reviews mention the same item; in practice the corpus is item-disjoint enough that this is rare.
-- The eval issues **two requests per sample**, so a 30-sample run is ~60 calls. Mind your Groq free-tier rate limit if you push `--limit` high.
+- The eval issues **two requests per sample**, so a 30-sample run is approximately 60 calls. Account for Groq free-tier rate limits when increasing `--limit`.
