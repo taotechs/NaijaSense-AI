@@ -105,7 +105,7 @@ Record these values for documentation and operational handoff:
 
 | Field | Value |
 |---|---|
-| GitHub repo | `https://github.com/<org-or-user>/NaijaSense-AI` |
+| GitHub repo | `https://github.com/taotechs/NaijaSense-AI.git` |
 | Live demo (frontend) | `https://naijasense-ai.vercel.app` |
 | API endpoint | `https://<koyeb-url>/api/agent/v1` |
 | Docker setup | Already covered by `Dockerfile` + `docker-compose.yml` in the repo |
