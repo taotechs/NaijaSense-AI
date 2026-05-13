@@ -2,7 +2,7 @@
 
 **Team:** TAOTECH SOLUTIONS
 
-NaijaSense AI is a context-aware, multi-agent system for the **DSN × Bluechip Tech LLM Agent Challenge (DSAS 2026)**. It tackles both competition tasks behind one unified API and a single chat UI branded as the **Behavioral Intelligence Hub**:
+NaijaSense AI is a context-aware, multi-agent system designed around two core workloads behind one unified API and a single chat UI branded as the **Behavioral Intelligence Hub**:
 
 - **Task A — User Modeling:** simulate a star rating and a written review for an unseen item, conditioned on a user persona inferred from minimal signals.
 - **Task B — Recommendation:** rank items for an individual user, handling cold-start, cross-domain, and multi-turn conversational queries with explicit reasoning traces.
@@ -17,7 +17,7 @@ The system intentionally **separates a small fast router model from a strong gen
 
 ---
 
-## Why this submission
+## Project highlights
 
 - **Honest, reproducible benchmarks.** Ablation numbers in [`data/benchmark_results.json`](data/benchmark_results.json) measured on a held-out slice of Yelp + Goodreads + Amazon reviews, plus a behavioural-fidelity A/B harness ([`scripts/eval_fidelity.py`](scripts/eval_fidelity.py), [`docs/EVAL.md`](docs/EVAL.md)) that quantifies how much the silent history step moves the needle.
 - **Streaming agentic UX.** The unified gateway has a non-blocking NDJSON streaming sibling (`POST /api/agent/v1/stream`) that emits each reasoning step as it fires; the UI renders them as an animated timeline so the agent's thinking is visible in real time.
@@ -37,10 +37,10 @@ The system intentionally **separates a small fast router model from a strong gen
 flowchart LR
     U[User] --> FE[Behavioral Intelligence Hub<br/>Next.js /unified]
     U --> SW[Swagger /docs]
-    FE -->|POST| AGW[/api/agent/v1<br/>+ multi-turn buffer]
-    FE -->|POST NDJSON| STR[/api/agent/v1/stream<br/>live reasoning steps]
-    FE -->|POST thumbs| FB[/api/agent/feedback<br/>JSONL log]
-    FE -->|GET| HC[/api/v1/health<br/>status pill + pre-warm]
+    FE -->|POST| AGW[Agent Gateway v1<br/>multi-turn buffer]
+    FE -->|POST NDJSON| STR[Streaming Gateway<br/>live reasoning steps]
+    FE -->|POST thumbs| FB[Feedback Endpoint<br/>JSONL log]
+    FE -->|GET| HC[Health Check<br/>status pill + pre-warm]
     SW --> AGW
     AGW --> SAFE[Safety Layer<br/>prompt-injection / PII / ungrounded specifics]
     STR --> SAFE
@@ -97,12 +97,12 @@ The `UserModelingAgent` then merges this baseline with the UI-supplied persona u
 
 > Going live? See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for a step-by-step Vercel (frontend) + Koyeb (backend) deploy, plus drop-in alternatives for Render, Fly.io, Hugging Face Spaces, and Railway. The repo ships with `koyeb.yaml`, `render.yaml`, and a `$PORT`-aware `Dockerfile` so the live deploy is essentially clone → connect → set env vars.
 
-### Option A · Docker Compose (recommended for judges)
+### Option A · Docker Compose (recommended)
 
 Spins up the FastAPI backend, the Next.js Behavioral Intelligence Hub UI, and a Chroma vector store with one command:
 
 ```bash
-git clone https://github.com/<your-org>/NaijaSense-AI.git
+git clone https://github.com/taotechs/NaijaSense-AI.git
 cd NaijaSense-AI
 cp .env.example .env            # then edit and add GROQ_API_KEY (or OPENAI_API_KEY)
 docker compose up --build
@@ -150,7 +150,7 @@ Open <http://localhost:3000> — the home route redirects to `/unified`, which i
 
 ### Using the UI
 
-The Behavioral Intelligence Hub gives the judge everything they need from one screen.
+The Behavioral Intelligence Hub centralizes core interaction and observability features in one screen.
 
 <p align="center">
   <img src="docs/input.png" width="380" alt="Unified hub — query filled in and behavioral profile section" />
@@ -183,7 +183,7 @@ curl http://localhost:8000/api/v1/health
 python scripts/smoke_api.py http://127.0.0.1:8000
 ```
 
-If both pass, the submission is functional end-to-end.
+If both commands pass, the stack is functional end-to-end.
 
 ---
 
@@ -244,7 +244,7 @@ curl -X POST "http://localhost:8000/api/agent/v1" \
   -H "Content-Type: application/json" \
   -d '{
     "user_persona": {
-      "user_id": "judge_demo",
+      "user_id": "demo_user",
       "location": "Lagos",
       "interests": ["street food", "amala"],
       "sentiment_bias": "balanced",
@@ -263,7 +263,7 @@ The response includes `task`, `routing_source` (`llm` or `heuristic`), `review`/
 ```bash
 curl -N -X POST "http://localhost:8000/api/agent/v1/stream" \
   -H "Content-Type: application/json" \
-  -d '{ "user_persona": {"user_id":"judge_demo", "language":"pidgin"},
+  -d '{ "user_persona": {"user_id":"demo_user", "language":"pidgin"},
         "query": "Suggest cheap weekend places to eat in Yaba." }'
 ```
 
@@ -364,7 +364,7 @@ Outputs go to `data/eval/`:
 
 Full methodology, metric definitions, and interpretation guide in [`docs/EVAL.md`](docs/EVAL.md).
 
-### Smoke harnesses (judges can run these in under a minute)
+### Smoke harnesses (quick checks)
 
 ```bash
 # Calibration check: vague vs rich input, observe critique pass behaviour
@@ -409,7 +409,7 @@ pytest -q
 
 ---
 
-## Submission checklist
+## Feature checklist
 
 - ✅ Task A containerised app (API + Web)
 - ✅ Task B containerised app (API + Web)
