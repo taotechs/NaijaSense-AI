@@ -5,9 +5,9 @@
 
 ## Abstract
 
-NaijaSense AI is a dual-task, stateful LLM system for the challenge requirements: **Task A** (simulate user review + star rating for unseen items) and **Task B** (personalized recommendation ranking). Our central idea is simple: before any generation, the system silently retrieves historical behavior by `user_id` and merges it with current user inputs to build a grounded persona. We combine this with a role-split model strategy (fast router + strong generator), retrieval-augmented review generation, an optional critique-regenerate quality pass, and a deterministic recommendation scorer with explainability traces.
+NaijaSense AI is a dual-task, stateful LLM system for **Task A** (review + rating simulation) and **Task B** (personalized recommendation ranking). The core differentiator is silent history retrieval by `user_id` before generation, followed by persona merge with current user inputs. The stack combines a role-split model strategy (fast router + strong generator), retrieval-augmented review generation, optional critique-regenerate quality control, and a deterministic recommendation scorer with explainability traces.
 
-The product is not just a backend pipeline. We ship an operational hub (`/unified`) with one-response UX, live reasoning timeline via NDJSON streaming, safety advisories, language controls (English, Nigerian Pidgin, English+Yoruba mix), health pre-warm status, and thumbs feedback logging. Our ablations show that LLM generation is the strongest driver for review quality, while the deterministic Task B ranker is interpretable but weak on hard same-domain distractor sets. We report this limitation honestly and define a concrete next step: LLM reranking on top-K candidates.
+The system ships with a production-style hub (`/unified`) that includes single-response UX, live NDJSON reasoning timeline, safety advisories, language control (English/Pidgin/Yoruba mix), health pre-warm status, and thumbs feedback logging. Results show LLM generation is the strongest quality lever for Task A, while Task B ranking remains interpretable but weak on hard same-domain distractors; the next step is LLM reranking on top-K candidates.
 
 ---
 
@@ -22,11 +22,7 @@ The system design emphasizes:
 - Nigerian context readiness
 - Reproducibility and honest reporting
 
-Design constraints:
-
-1. Keep outputs diverse and non-repetitive for identical prompts.
-2. Keep reasoning auditable (not black-box text only).
-3. Keep latency and cost reasonable on constrained infrastructure.
+Design constraints: output diversity, reasoning transparency, and low-latency/low-cost deployment.
 
 ---
 
@@ -62,14 +58,14 @@ This keeps cost low while preserving quality where it matters most.
 
 ### 2.2 Silent context retrieval (core differentiator)
 
-For every request, we run a pre-LLM step:
+For every request, the system runs a pre-LLM step:
 
 1. Pull up to five past records for `user_id`.
 2. Build `HistoricalPersona` (`avg_rating`, `rating_tendency`, `tone_signal`, top domains/interests).
 3. Merge with UI persona fields using default-vs-override logic.
 4. Log provenance in reasoning metadata.
 
-Unknown users do not break flow; the system falls back to current input signals.
+Unknown users fall back to current input signals.
 
 ---
 
@@ -85,15 +81,11 @@ We use a **facts-in, prose-out** prompt contract:
 
 ### 3.2 Diversity controls
 
-To avoid repeated outputs on identical requests:
-
-- per-call seed
-- high-variance sampling (`temperature`, `top_p`, presence/frequency penalties)
-- anti-template prompt rules (discourage stock openings)
+To avoid repeated outputs on identical requests, generation uses per-call seed, tuned sampling (`temperature`, `top_p`, presence/frequency penalties), and anti-template prompt rules.
 
 ### 3.3 Critique-regenerate pass
 
-A low-cost critic scores review specificity (1–5 rubric). If below threshold, we regenerate using explicit issue prompts. In most cases, strong outputs pass in one shot, preserving cost.
+A low-cost critic scores review specificity (1-5 rubric). If below threshold, the system regenerates with explicit issue prompts. Most outputs pass in one shot, keeping cost low.
 
 ### 3.4 Language and local context
 
@@ -103,7 +95,7 @@ Output modes:
 - `pidgin`
 - `yoruba_mix`
 
-This directly supports Nigerian contextualization scoring without forcing slang into formal outputs.
+This supports local contextualization without forcing slang into formal outputs.
 
 ---
 
@@ -126,10 +118,6 @@ The conversational summary is LLM-generated but **does not** alter ranking order
 
 A per-user rolling buffer is threaded into Task B requests. Previous turns influence ranking signals and are surfaced in explainability outputs.
 
-### 4.3 Why this design
-
-The design prioritizes reproducibility and transparent scoring under practical deployment constraints. The trade-off is lower ranking strength on semantically hard distractor sets (reported in Section 6).
-
 ---
 
 ## 5. Product Surface and Observability
@@ -138,18 +126,32 @@ The Behavioral Intelligence Hub is part of the solution quality, not only a demo
 
 Key shipped features:
 
-- single-response UX (no duplicate compare outputs)
-- live reasoning timeline from `/api/agent/v1/stream`
-- backend status pill with pre-warm health check
-- routed-task and latency chips
-- safety advisory badges (`safety_flags`)
-- thumbs feedback to JSONL (`/api/agent/feedback`)
+- Single-response UX (no duplicate compare outputs)
+- Live reasoning timeline from `/api/agent/v1/stream`
+- Backend status pill with pre-warm health check
+- Routed-task and latency chips
+- Safety advisory badges (`safety_flags`)
+- Thumbs feedback to JSONL (`/api/agent/feedback`)
 
 <p align="center">
-  <img src="homescreen.png" width="380" alt="Behavioral Intelligence Hub home screen" />
-  <img src="input.png" width="380" alt="Input form and persona controls" />
-  <img src="output.png" width="380" alt="Final response with trace and feedback controls" />
+  <img src="homescreen.png" width="360" alt="Figure 1. Home screen after opening https://naija-sense-ai.vercel.app/ showing the Behavioral Intelligence Hub entry view." />
 </p>
+
+**Figure 1. Home screen** (`homescreen.png`): initial view shown after opening [https://naija-sense-ai.vercel.app/](https://naija-sense-ai.vercel.app/), including quick prompts, language selector, and status indicator.
+
+<p align="center">
+  <img src="input.png" width="360" alt="Figure 2. Input workflow with user prompt, persona fields, and task controls before sending to the agent." />
+</p>
+
+**Figure 2. Input workflow** (`input.png`): the interaction step where the user enters query, persona context, and language before submitting to the gateway.
+
+<p align="center">
+  <img src="output.png" width="360" alt="Figure 3. Output view with generated result, routing badges, safety flags, and reasoning trace." />
+</p>
+
+**Figure 3. Output view** (`output.png`): result card after inference, showing routed task, generated content, safety advisories, and reasoning trace.
+
+The UI flow is: **Figure 1 (entry)** -> **Figure 2 (input)** -> **Figure 3 (output)**.
 
 ---
 
@@ -175,11 +177,7 @@ Variants:
 | no_critique | 0.165 | 0.102 | **0.132** | 1.240 |
 | no_llm | 0.126 | 0.086 | 0.123 | 1.242 |
 
-Interpretation:
-
-- LLM generation is the strongest quality lever (largest drop in no-LLM variant).
-- RAG can reduce lexical-overlap metrics while improving concrete writing quality.
-- Critique pass is primarily a qualitative safeguard, not a lexical metric booster.
+Interpretation: LLM generation is the strongest quality lever (largest drop in `no_llm`), RAG can lower lexical overlap while improving concreteness, and critique mainly improves qualitative quality.
 
 ### 6.3 Task B results
 
@@ -190,43 +188,26 @@ Interpretation:
 | `no_critique` | 0.062 | 0.20 |
 | `no_llm` | 0.062 | 0.20 |
 
-Random baseline on this hard set is higher for Hit Rate@10 (~0.50), revealing a real gap in current ranking quality.
+Random baseline on this hard set is higher for Hit Rate@10 (~0.50), revealing a ranking gap.
 
 ### 6.4 Behavioral-fidelity A/B
 
-Using `scripts/eval_fidelity.py`, we run paired tests:
-
-- with history (`include_history=true`)
-- without history (`include_history=false`)
-
-and compare rating error, token similarity, and tone match. This directly measures the value of silent context retrieval, not just generic generation quality.
+`scripts/eval_fidelity.py` runs paired tests with and without history (`include_history=true/false`) and compares rating error, token similarity, and tone match. This isolates the contribution of silent context retrieval.
 
 ---
 
 ## 7. Reproducibility
 
-### Environment
+Environment: Python 3.11+, `pip install -r requirements.txt`, and `.env` from `.env.example`.
 
-- Python 3.11+ recommended
-- `pip install -r requirements.txt`
-- configure `.env` from `.env.example`
-
-### Run stack
+Run stack:
 
 ```bash
 docker compose up --build
 ```
 
-Endpoints:
-
-- API: `http://localhost:8000`
-- Swagger: `http://localhost:8000/docs`
-- Hub UI: `http://localhost:3000/unified`
-
-Evaluation scripts:
-
-- `python scripts/run_real_benchmark.py --all_variants`
-- `python scripts/eval_fidelity.py`
+Core endpoints: `http://localhost:8000` (API), `http://localhost:8000/docs` (Swagger), `http://localhost:3000/unified` (Hub UI).  
+Evaluation: `python scripts/run_real_benchmark.py --all_variants` and `python scripts/eval_fidelity.py`.
 
 ---
 
@@ -244,4 +225,4 @@ Evaluation scripts:
 
 NaijaSense AI delivers a practical, auditable, and locally contextualized dual-task agent for review simulation and recommendation. The strongest contribution is a measurable stateful workflow: silent history retrieval, persona merge, and transparent reasoning traces visible both in API outputs and in the live hub.
 
-This document reports both strengths and gaps. Task A quality is competitive and diverse; Task B explainability is strong but ranking quality on hard distractor sets requires LLM reranking. This clarity provides a strong engineering baseline for subsequent iterations.
+Task A quality is competitive and diverse; Task B explainability is strong but ranking on hard distractor sets requires LLM reranking. The system is reproducible, observable, and ready for iterative improvement.
