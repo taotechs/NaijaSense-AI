@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { BackendStatus } from "@/components/BackendStatus";
 import { publicTaskUrl } from "@/lib/api-root";
+import { TASK_A_PRESETS } from "@/lib/task-a-presets";
 import { TaskAResponse, postTaskA } from "@/lib/task-api";
 
 function StarRow({ rating }: { rating: number }) {
@@ -11,29 +12,34 @@ function StarRow({ rating }: { rating: number }) {
   return (
     <div className="flex items-center gap-1 text-amber-400" aria-label={`Rating ${rating} of 5`}>
       {Array.from({ length: 5 }).map((_, i) => (
-        <span key={i}>{i < full ? "\u2605" : "\u2606"}</span>
+        <span key={i} className="text-xl">
+          {i < full ? "\u2605" : "\u2606"}
+        </span>
       ))}
-      <span className="ml-2 text-sm text-slate-400">{rating.toFixed(1)} / 5</span>
+      <span className="ml-2 text-base font-medium text-slate-200">{rating.toFixed(1)} / 5</span>
     </div>
   );
 }
 
 export default function TaskAPage() {
-  const [userId, setUserId] = useState("demo_user");
-  const [location, setLocation] = useState("Lagos");
-  const [interests, setInterests] = useState("street food, amala, suya");
-  const [sentiment, setSentiment] = useState("balanced");
-  const [toneNotes, setToneNotes] = useState("Value for money; honest Nigerian tone.");
-  const [itemName, setItemName] = useState("Iya Eba Amala Spot");
-  const [itemContext, setItemContext] = useState(
-    "Saturday lunch with a friend; amala soft, egusi rich, about 2k each, 20 min wait."
-  );
+  const defaultPreset = TASK_A_PRESETS[0];
+  const [presetId, setPresetId] = useState(defaultPreset.id);
+  const [userPersona, setUserPersona] = useState(defaultPreset.user_persona);
+  const [productDetails, setProductDetails] = useState(defaultPreset.product_details);
 
   const [result, setResult] = useState<TaskAResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const endpoint = publicTaskUrl("/task-a/user-modeling");
+
+  function onPresetChange(id: string) {
+    const preset = TASK_A_PRESETS.find((p) => p.id === id);
+    if (!preset) return;
+    setPresetId(id);
+    setUserPersona(preset.user_persona);
+    setProductDetails(preset.product_details);
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -42,21 +48,8 @@ export default function TaskAPage() {
     setResult(null);
     try {
       const res = await postTaskA({
-        user_persona: {
-          user_id: userId.trim(),
-          location,
-          interests: interests
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-          sentiment_bias: sentiment,
-          tone_notes: toneNotes,
-        },
-        product_details: {
-          item_name: itemName.trim(),
-          item_context: itemContext,
-        },
-        persona_style: "nigerian_twitter",
+        user_persona: userPersona.trim(),
+        product_details: productDetails.trim(),
       });
       setResult(res);
     } catch (err) {
@@ -73,7 +66,7 @@ export default function TaskAPage() {
           <p className="text-[11px] uppercase tracking-[0.22em] text-brand-500">Task A</p>
           <h2 className="text-xl font-semibold text-slate-100">User modeling</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Persona + product → star rating + written review (hackathon endpoint).
+            User persona + product details → star rating and full review text.
           </p>
           <p className="mt-2 break-all font-mono text-[10px] text-slate-500">
             POST {endpoint}
@@ -83,47 +76,79 @@ export default function TaskAPage() {
       </div>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <form onSubmit={onSubmit} className="glass space-y-3 rounded-2xl p-6">
-          <h3 className="font-medium text-slate-200">User persona</h3>
-          <input className="field" value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="User ID" required />
-          <input className="field" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" />
-          <input className="field" value={interests} onChange={(e) => setInterests(e.target.value)} placeholder="Interests (comma-separated)" />
-          <select className="field" value={sentiment} onChange={(e) => setSentiment(e.target.value)}>
-            <option value="positive">Positive</option>
-            <option value="balanced">Balanced</option>
-            <option value="critical">Critical</option>
-          </select>
-          <textarea className="field min-h-16" value={toneNotes} onChange={(e) => setToneNotes(e.target.value)} placeholder="Tone / style notes" />
+        <form onSubmit={onSubmit} className="glass space-y-4 rounded-2xl p-6">
+          <label className="block text-xs text-slate-400">
+            Preset (optional)
+            <select
+              className="field mt-1"
+              value={presetId}
+              onChange={(e) => onPresetChange(e.target.value)}
+            >
+              {TASK_A_PRESETS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+              <option value="custom">Custom</option>
+            </select>
+          </label>
 
-          <h3 className="pt-2 font-medium text-slate-200">Product details</h3>
-          <input className="field" value={itemName} onChange={(e) => setItemName(e.target.value)} placeholder="Item name" required />
-          <textarea className="field min-h-24" value={itemContext} onChange={(e) => setItemContext(e.target.value)} placeholder="What happened? Price, wait, taste…" />
+          <label className="block text-sm font-medium text-slate-200">
+            User Persona
+            <textarea
+              className="field mt-2 min-h-36"
+              value={userPersona}
+              onChange={(e) => {
+                setUserPersona(e.target.value);
+                setPresetId("custom");
+              }}
+              placeholder="Who is this user? Location, budget, tone, preferences…"
+              required
+              minLength={20}
+            />
+          </label>
+
+          <label className="block text-sm font-medium text-slate-200">
+            Product Details
+            <textarea
+              className="field mt-2 min-h-32"
+              value={productDetails}
+              onChange={(e) => {
+                setProductDetails(e.target.value);
+                setPresetId("custom");
+              }}
+              placeholder="What product or experience? Price, wait, taste, service…"
+              required
+              minLength={10}
+            />
+          </label>
 
           <button type="submit" className="btn w-full" disabled={loading}>
-            {loading ? "Generating review…" : "Run Task A"}
+            {loading ? "Generating…" : "Run Task A"}
           </button>
           {error && <p className="rounded-lg bg-red-500/15 p-2 text-sm text-red-300">{error}</p>}
         </form>
 
         <div className="glass space-y-4 rounded-2xl p-6">
-          <h3 className="text-lg font-semibold">Output</h3>
+          <h3 className="text-lg font-semibold text-slate-100">Output</h3>
           {!result && (
-            <p className="text-sm text-slate-400">Fill the form and run Task A to see rating + review here.</p>
+            <p className="text-sm text-slate-400">
+              Submit persona and product details to see the star rating and review.
+            </p>
           )}
           {result && (
-            <>
-              <StarRow rating={result.rating} />
-              <details className="rounded-xl border border-slate-800 bg-slate-900/50 p-3" open>
-                <summary className="cursor-pointer text-sm font-medium text-slate-300">
-                  Pass 1 — review_reasoning
-                </summary>
-                <p className="mt-2 text-xs text-slate-400">{result.review_reasoning}</p>
-              </details>
-              <div className="rounded-xl bg-slate-900/80 p-4 text-sm leading-relaxed text-slate-200">
-                <p className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Pass 2 — review_text</p>
-                {result.review_text}
+            <div className="space-y-4">
+              <div>
+                <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">Star rating</p>
+                <StarRow rating={result.rating} />
               </div>
-            </>
+              <div>
+                <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">Review</p>
+                <p className="rounded-xl bg-slate-900/80 p-4 text-sm leading-relaxed text-slate-200">
+                  {result.review_text}
+                </p>
+              </div>
+            </div>
           )}
         </div>
       </section>
@@ -135,10 +160,6 @@ export default function TaskAPage() {
         {" · "}
         <Link href="/task-b" className="text-brand-500 hover:underline">
           Task B demo
-        </Link>
-        {" · "}
-        <Link href="/unified" className="text-brand-500 hover:underline">
-          Unified hub
         </Link>
       </p>
     </div>

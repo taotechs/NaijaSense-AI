@@ -30,27 +30,14 @@ async function taskRequest<T>(path: string, body: unknown): Promise<T> {
 }
 
 export type TaskAPayload = {
-  user_persona: {
-    user_id: string;
-    location?: string;
-    interests?: string[];
-    sentiment_bias?: string;
-    tone_notes?: string;
-    history?: string;
-    language?: string;
-  };
-  product_details: {
-    item_name: string;
-    item_context?: string;
-    category?: string;
-  };
-  persona_style?: string;
+  user_persona: string;
+  product_details: string;
 };
 
 export type TaskAResponse = {
   rating: number;
-  review_reasoning: string;
   review_text: string;
+  review_reasoning?: string;
 };
 
 export function postTaskA(payload: TaskAPayload) {
