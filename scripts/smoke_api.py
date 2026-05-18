@@ -72,14 +72,18 @@ def _smoke_hackathon_tasks(base_url: str) -> None:
         tb = client.post(
             f"{base_url}/task-b/recommendation",
             json={
-                "user_persona": {"user_id": "smoke_b", "interests": []},
-                "context": "Weekend food in Lagos",
-                "top_k": 3,
+                "user_persona": {
+                    "user_id": "smoke_b",
+                    "persona": (
+                        "Lagos weekend explorer on a moderate budget — enjoys buka food, "
+                        "Nollywood movies, and casual drinks with friends."
+                    ),
+                },
             },
         )
         tb.raise_for_status()
     print("Hackathon Task A rating:", ta.json().get("rating"))
-    print("Hackathon Task B top pick:", tb.json()["recommendations"][0]["item_name"])
+    print("Hackathon Task B top pick:", tb.json()["recommendations"][0]["title"])
     print()
 
 

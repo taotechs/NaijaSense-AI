@@ -4,21 +4,28 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { BackendStatus } from "@/components/BackendStatus";
 import { publicTaskUrl } from "@/lib/api-root";
+import { TASK_B_PERSONA_PRESETS } from "@/lib/task-b-personas";
 import { TaskBResponse, postTaskB } from "@/lib/task-api";
 
 export default function TaskBPage() {
-  const [userId, setUserId] = useState("demo_user");
-  const [location, setLocation] = useState("Yaba, Lagos");
-  const [interests, setInterests] = useState("food, street food");
-  const [sentiment, setSentiment] = useState("balanced");
-  const [context, setContext] = useState("Cheap weekend food spots, not too far from campus.");
-  const [topK, setTopK] = useState(5);
+  const defaultPreset = TASK_B_PERSONA_PRESETS[0];
+  const [presetId, setPresetId] = useState(defaultPreset.id);
+  const [userId, setUserId] = useState(defaultPreset.user_id);
+  const [persona, setPersona] = useState(defaultPreset.persona);
 
   const [result, setResult] = useState<TaskBResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const endpoint = publicTaskUrl("/task-b/recommendation");
+
+  function onPresetChange(id: string) {
+    const preset = TASK_B_PERSONA_PRESETS.find((p) => p.id === id);
+    if (!preset) return;
+    setPresetId(id);
+    setUserId(preset.user_id);
+    setPersona(preset.persona);
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -29,15 +36,8 @@ export default function TaskBPage() {
       const res = await postTaskB({
         user_persona: {
           user_id: userId.trim(),
-          location,
-          interests: interests
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-          sentiment_bias: sentiment,
+          persona: persona.trim(),
         },
-        context,
-        top_k: topK,
       });
       setResult(res);
     } catch (err) {
@@ -54,7 +54,7 @@ export default function TaskBPage() {
           <p className="text-[11px] uppercase tracking-[0.22em] text-brand-500">Task B</p>
           <h2 className="text-xl font-semibold text-slate-100">Recommendation</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Persona (+ optional query) → ranked list with Reason-Before-Recommend trace.
+            User persona only → personalized picks across Food, Movies, Drinks, and more.
           </p>
           <p className="mt-2 break-all font-mono text-[10px] text-slate-500">
             POST {endpoint}
@@ -66,31 +66,42 @@ export default function TaskBPage() {
       <section className="grid gap-6 lg:grid-cols-2">
         <form onSubmit={onSubmit} className="glass space-y-3 rounded-2xl p-6">
           <h3 className="font-medium text-slate-200">User persona</h3>
-          <input className="field" value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="User ID" required />
-          <input className="field" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" />
-          <input className="field" value={interests} onChange={(e) => setInterests(e.target.value)} placeholder="Interests (comma-separated)" />
-          <select className="field" value={sentiment} onChange={(e) => setSentiment(e.target.value)}>
-            <option value="positive">Positive</option>
-            <option value="balanced">Balanced</option>
-            <option value="critical">Critical</option>
-          </select>
-          <textarea
-            className="field min-h-20"
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            placeholder="What are you looking for? (optional context query)"
-          />
+
           <label className="block text-xs text-slate-400">
-            Top K
-            <input
+            Preset profile
+            <select
               className="field mt-1"
-              type="number"
-              min={1}
-              max={20}
-              value={topK}
-              onChange={(e) => setTopK(Number(e.target.value) || 5)}
-            />
+              value={presetId}
+              onChange={(e) => onPresetChange(e.target.value)}
+            >
+              {TASK_B_PERSONA_PRESETS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+              <option value="custom">Custom (edit below)</option>
+            </select>
           </label>
+
+          <input
+            className="field"
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+            placeholder="User ID"
+            required
+          />
+
+          <textarea
+            className="field min-h-40"
+            value={persona}
+            onChange={(e) => {
+              setPersona(e.target.value);
+              setPresetId("custom");
+            }}
+            placeholder="Describe lifestyle, budget, location, and tastes (food, movies, drinks, tech…)"
+            required
+            minLength={20}
+          />
 
           <button type="submit" className="btn w-full" disabled={loading}>
             {loading ? "Ranking…" : "Run Task B"}
@@ -101,26 +112,12 @@ export default function TaskBPage() {
         <div className="glass space-y-4 rounded-2xl p-6">
           <h3 className="text-lg font-semibold">Output</h3>
           {!result && (
-            <p className="text-sm text-slate-400">Run Task B to see ranked recommendations here.</p>
+            <p className="text-sm text-slate-400">
+              Submit a persona to see corpus-backed recommendations with LLM confidence scores.
+            </p>
           )}
           {result && (
             <>
-              <ul className="space-y-3">
-                {result.recommendations.map((item, idx) => (
-                  <li
-                    key={item.item_id}
-                    className="rounded-xl border border-slate-800 bg-slate-900/80 p-3"
-                  >
-                    <p className="text-sm font-medium text-slate-100">
-                      #{idx + 1} {item.title}
-                      <span className="ml-2 text-brand-400">
-                        {item.domain} · {(item.confidence_score * 100).toFixed(0)}%
-                      </span>
-                    </p>
-                    <p className="mt-1 font-mono text-[10px] text-slate-500">{item.item_id}</p>
-                  </li>
-                ))}
-              </ul>
               <details className="rounded-xl border border-slate-800 bg-slate-900/50 p-3" open>
                 <summary className="cursor-pointer text-sm font-medium text-slate-300">
                   agent_reasoning
@@ -129,6 +126,24 @@ export default function TaskBPage() {
                   {result.agent_reasoning}
                 </p>
               </details>
+              <ul className="space-y-3">
+                {result.recommendations.map((item, idx) => (
+                  <li
+                    key={item.item_id}
+                    className="rounded-xl border border-slate-800 bg-slate-900/80 p-3"
+                  >
+                    <p className="text-sm font-medium text-slate-100">
+                      #{idx + 1} {item.title}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      <span className="capitalize text-brand-400">{item.domain}</span>
+                      {" · "}
+                      confidence {(item.confidence_score * 100).toFixed(1)}%
+                    </p>
+                    <p className="mt-1 font-mono text-[10px] text-slate-500">{item.item_id}</p>
+                  </li>
+                ))}
+              </ul>
             </>
           )}
         </div>

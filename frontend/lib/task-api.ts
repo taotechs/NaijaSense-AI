@@ -60,16 +60,8 @@ export function postTaskA(payload: TaskAPayload) {
 export type TaskBPayload = {
   user_persona: {
     user_id: string;
-    location?: string;
-    interests?: string[];
-    sentiment_bias?: string;
-    tone_notes?: string;
-    history?: string;
-    language?: string;
+    persona: string;
   };
-  context?: string;
-  top_k?: number;
-  candidate_items?: string[];
 };
 
 export type TaskBRecommendation = {

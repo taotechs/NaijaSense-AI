@@ -29,15 +29,14 @@ def test_task_a_two_pass_heuristic() -> None:
     assert len(out["review_text"]) > 15
 
 
-def test_task_b_pipeline_cold_start() -> None:
+def test_task_b_pipeline_persona_only() -> None:
     agent = TaskBPipelineAgent()
     out = agent.run(
-        user_model={"user_id": "new", "location": "Lagos", "bias": "balanced"},
-        interests=[],
-        context="weekend food",
+        user_id="new_user",
+        persona_narrative=(
+            "Lagos student with low budget, enjoys street food, movies on weekends, and cheap drinks."
+        ),
         top_k=3,
-        cold_start=True,
-        cross_domain=True,
     )
     assert len(out["recommendations"]) == 3
     assert out["agent_reasoning"]

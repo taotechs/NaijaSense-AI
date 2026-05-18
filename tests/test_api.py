@@ -121,17 +121,16 @@ def test_task_b_recommendation() -> None:
     payload = {
         "user_persona": {
             "user_id": "hackathon_b",
-            "location": "Yaba, Lagos",
-            "interests": [],
-            "sentiment_bias": "positive",
+            "persona": (
+                "Yaba student on a tight budget who loves cheap jollof, weekend Nollywood "
+                "with friends, and affordable smoothies — no premium spots."
+            ),
         },
-        "context": "Cheap weekend food spots, not too far.",
-        "top_k": 3,
     }
     response = client.post("/task-b/recommendation", json=payload)
     body = response.json()
     assert response.status_code == 200
-    assert len(body["recommendations"]) == 3
+    assert len(body["recommendations"]) >= 1
     assert body["recommendations"][0]["item_id"]
     assert body["recommendations"][0]["title"]
     assert body["recommendations"][0]["domain"]
