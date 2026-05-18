@@ -144,6 +144,14 @@ def test_landing_page() -> None:
     assert "/task-b/recommendation" in response.text
 
 
+def test_task_endpoints_get_info_pages() -> None:
+    for path in ("/task-a/user-modeling", "/task-b/recommendation"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert "Endpoint is live" in response.text
+        assert "POST" in response.text
+
+
 def test_simulate_review_validation_error() -> None:
     payload = {
         "user_profile": {"user_id": "u1"},
