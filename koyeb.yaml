@@ -7,6 +7,8 @@
 # Usage:
 #   1. Sign up: https://app.koyeb.com/auth/signup (GitHub login, no credit card)
 #   2. Create App > GitHub > pick this repo > Docker build > select root Dockerfile.
+#      The Dockerfile runs ensure_large_corpus.py at build time (10k rows + index).
+#      Entrypoint re-checks on container start; /api/v1/health reports corpus.large_corpus_ready.
 #   3. App Settings > Definition > paste this file's contents.
 #   4. Variables tab > add the two secrets marked `<set in dashboard>` below.
 #   5. Deploy. Koyeb gives you a https://<app>-<org>.koyeb.app URL.
@@ -36,7 +38,7 @@ services:
       - http:
           path: /api/v1/health
           port: 8000
-        grace_period: 30
+        grace_period: 60   # first boot may run ensure_large_corpus if corpus not in image
     env:
       - key: APP_ENV
         value: production

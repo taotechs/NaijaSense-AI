@@ -1,5 +1,9 @@
 """FastAPI application setup."""
 
+from __future__ import annotations
+
+import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +15,30 @@ from api.landing import router as landing_router
 from api.routes import router
 from api.task_routes import router as task_router
 from utils.config import settings
+from utils.logger import get_logger
+
+_startup_logger = get_logger("startup")
+
+
+def _ensure_corpus_sync() -> None:
+    """Non-Docker runs: build corpus on first boot if files are missing."""
+    if not settings.corpus_build_on_startup:
+        return
+    try:
+        from scripts.ensure_large_corpus import ensure_large_corpus
+
+        ensure_large_corpus()
+    except Exception as exc:  # pragma: no cover
+        _startup_logger.warning("Corpus ensure skipped or failed: %s", exc)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    del app  # unused
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _ensure_corpus_sync)
+    yield
+
 
 app = FastAPI(
     title="NaijaSense AI",
@@ -19,6 +47,7 @@ app = FastAPI(
         "(recommendation) with dual submission endpoints."
     ),
     version="2.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

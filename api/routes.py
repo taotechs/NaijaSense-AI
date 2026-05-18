@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
 
 from api.deps import api_logger, orchestrator
+from utils.config import settings
 from utils.schemas import (
     ErrorResponse,
     RecommendationRequest,
@@ -18,7 +19,17 @@ router = APIRouter()
 
 @router.get("/health")
 def healthcheck() -> dict:
-    return {"status": "ok", "service": "naijasense-ai"}
+    from scripts.ensure_large_corpus import corpus_is_ready
+
+    return {
+        "status": "ok",
+        "service": "naijasense-ai",
+        "corpus": {
+            "large_corpus_ready": corpus_is_ready(),
+            "large_corpus_path": settings.large_corpus_path,
+            "corpus_index_path": settings.corpus_index_path,
+        },
+    }
 
 
 @router.post(
