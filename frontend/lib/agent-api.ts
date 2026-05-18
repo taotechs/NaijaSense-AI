@@ -3,10 +3,11 @@
  * This handles the bridge to the Behavioral Intelligence Hub (FastAPI backend)
  */
 
+import { getApiRoot } from "@/lib/api-root";
+
 // 1. Base Configuration
-// We keep the URL as the base domain only to avoid double-pathing errors.
 const AGENT_URL =
-  process.env.NEXT_PUBLIC_AGENT_API_URL || "http://127.0.0.1:8000";
+  process.env.NEXT_PUBLIC_AGENT_API_URL || "http://127.0.0.1:8000/api/agent/v1";
 
 // 2. Type Definitions
 export type AgentLanguage = "english" | "pidgin" | "yoruba_mix";
@@ -178,8 +179,8 @@ export async function streamAgentGateway(
 export type BackendHealth = { status: string; service?: string };
 
 export async function getBackendHealth(): Promise<BackendHealth> {
-  // Health is mounted under the configured api_prefix (/api/v1).
-  const res = await fetch(`${AGENT_URL}/api/v1/health`, {
+  const root = getApiRoot() || "http://127.0.0.1:8000";
+  const res = await fetch(`${root}/api/v1/health`, {
     method: "GET",
     headers: { Accept: "application/json" },
     cache: "no-store",
