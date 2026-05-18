@@ -28,10 +28,25 @@ Design constraints: output diversity, reasoning transparency, and low-latency/lo
 
 ## 2. System Overview
 
+### 2.0 Dual-link submission architecture
+
+Judges require **two separate review URLs**. NaijaSense exposes dedicated, judge-friendly endpoints (no unified routing required):
+
+| Task | Endpoint | Input | Output |
+|------|----------|-------|--------|
+| A — User modeling | `POST /task-a/user-modeling` | `user_persona` + `product_details` | `rating` + `review` |
+| B — Recommendation | `POST /task-b/recommendation` | `user_persona` | ranked `recommendations` + `chain_of_thought` |
+
+The API root (`GET /`) serves an HTML landing page linking both endpoints. The Next.js home page mirrors the same links for Vercel deploys. Legacy routes (`/api/v1/*`, `/api/agent/v1`) remain for demos and ablations.
+
+**Why separate endpoints?** The hackathon form expects straightforward I/O per task. Splitting surfaces makes agentic reasoning auditable: Task A optimises Nigerian review fidelity; Task B runs an explicit **Reason-Before-Recommend** chain (persona scan → context → rank) before scoring candidates. Cold-start and cross-domain cases use Nigerian default interests and a curated cross-domain catalog (`core/nigerian_defaults.py`, `evals.py`).
+
 ```mermaid
 flowchart LR
     U[User] --> FE[Behavioral Intelligence Hub<br/>Next.js /unified]
     U --> SW[Swagger /docs]
+    U --> TA[POST /task-a/user-modeling]
+    U --> TB[POST /task-b/recommendation]
     FE -->|POST| AGW[Agent Gateway v1]
     FE -->|POST NDJSON| STR[Streaming Gateway]
     FE -->|POST feedback| FB[Feedback Endpoint]
