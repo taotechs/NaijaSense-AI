@@ -16,10 +16,12 @@ Use these **two separate URLs** in the DSN × BCT submission form:
 | Field | URL |
 |-------|-----|
 | App / landing | [https://naija-sense-ai.vercel.app/](https://naija-sense-ai.vercel.app/) |
-| Task A | `https://naija-sense-ai.vercel.app/task-a/user-modeling` |
-| Task B | `https://naija-sense-ai.vercel.app/task-b/recommendation` |
+| Task A | [https://naija-sense-ai.vercel.app/task-a/user-modeling](https://naija-sense-ai.vercel.app/task-a/user-modeling) |
+| Task B | [https://naija-sense-ai.vercel.app/task-b/recommendation](https://naija-sense-ai.vercel.app/task-b/recommendation) |
+| Task A demo UI | [https://naija-sense-ai.vercel.app/task-a](https://naija-sense-ai.vercel.app/task-a) |
+| Task B demo UI | [https://naija-sense-ai.vercel.app/task-b](https://naija-sense-ai.vercel.app/task-b) |
 | Interactive demo | [https://naija-sense-ai.vercel.app/unified](https://naija-sense-ai.vercel.app/unified) |
-| Backend (direct) | `https://youthful-wynn-taotechs-6715c87e.koyeb.app` |
+| Backend (direct) | [https://youthful-wynn-taotechs-6715c87e.koyeb.app](https://youthful-wynn-taotechs-6715c87e.koyeb.app) |
 
 **Evaluation module:** `evals.py` at repo root (RMSE, ROUGE, BERTScore fallback, NDCG@10, Hit Rate@10, cold-start helpers).
 
