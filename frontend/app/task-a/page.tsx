@@ -113,21 +113,16 @@ export default function TaskAPage() {
           {result && (
             <>
               <StarRow rating={result.rating} />
+              <details className="rounded-xl border border-slate-800 bg-slate-900/50 p-3" open>
+                <summary className="cursor-pointer text-sm font-medium text-slate-300">
+                  Pass 1 — review_reasoning
+                </summary>
+                <p className="mt-2 text-xs text-slate-400">{result.review_reasoning}</p>
+              </details>
               <div className="rounded-xl bg-slate-900/80 p-4 text-sm leading-relaxed text-slate-200">
-                {result.review}
+                <p className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Pass 2 — review_text</p>
+                {result.review_text}
               </div>
-              {result.reasoning_steps?.length > 0 && (
-                <details className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
-                  <summary className="cursor-pointer text-sm font-medium text-slate-300">
-                    Agent reasoning ({result.reasoning_steps.length} steps)
-                  </summary>
-                  <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-slate-400">
-                    {result.reasoning_steps.map((step, i) => (
-                      <li key={i}>{step}</li>
-                    ))}
-                  </ol>
-                </details>
-              )}
             </>
           )}
         </div>

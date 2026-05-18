@@ -105,42 +105,30 @@ export default function TaskBPage() {
           )}
           {result && (
             <>
-              {result.scenario_flags && (
-                <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-wide text-slate-400">
-                  {result.scenario_flags.cold_start && (
-                    <span className="rounded bg-slate-800 px-2 py-0.5">cold-start</span>
-                  )}
-                  {result.scenario_flags.cross_domain && (
-                    <span className="rounded bg-slate-800 px-2 py-0.5">cross-domain</span>
-                  )}
-                </div>
-              )}
               <ul className="space-y-3">
-                {result.recommendations.map((item) => (
+                {result.recommendations.map((item, idx) => (
                   <li
-                    key={item.rank}
+                    key={item.item_id}
                     className="rounded-xl border border-slate-800 bg-slate-900/80 p-3"
                   >
                     <p className="text-sm font-medium text-slate-100">
-                      #{item.rank} {item.item_name}
-                      <span className="ml-2 text-brand-400">score {item.score}</span>
+                      #{idx + 1} {item.title}
+                      <span className="ml-2 text-brand-400">
+                        {item.domain} · {(item.confidence_score * 100).toFixed(0)}%
+                      </span>
                     </p>
-                    <p className="mt-1 text-xs text-slate-400">{item.explanation}</p>
+                    <p className="mt-1 font-mono text-[10px] text-slate-500">{item.item_id}</p>
                   </li>
                 ))}
               </ul>
-              {result.chain_of_thought?.length > 0 && (
-                <details className="rounded-xl border border-slate-800 bg-slate-900/50 p-3" open>
-                  <summary className="cursor-pointer text-sm font-medium text-slate-300">
-                    Reason-Before-Recommend
-                  </summary>
-                  <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-slate-400">
-                    {result.chain_of_thought.map((line, i) => (
-                      <li key={i}>{line}</li>
-                    ))}
-                  </ol>
-                </details>
-              )}
+              <details className="rounded-xl border border-slate-800 bg-slate-900/50 p-3" open>
+                <summary className="cursor-pointer text-sm font-medium text-slate-300">
+                  agent_reasoning
+                </summary>
+                <p className="mt-2 whitespace-pre-wrap text-xs text-slate-400">
+                  {result.agent_reasoning}
+                </p>
+              </details>
             </>
           )}
         </div>
