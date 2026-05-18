@@ -14,6 +14,8 @@ class RecommendationAgent(BaseAgent):
     def run(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         user_model = payload["user_model"]
         candidate_items: List[str] = payload["candidate_items"]
+        # Reason-Before-Recommend: analyse persona/context before touching scores.
+        persona_reasoning = self._reason_before_recommend(user_model, payload)
         memory_hits: List[str] = payload.get("memory_hits", [])
         top_k = payload["top_k"]
         recommender_personality = payload.get("recommender_personality", "analyst")
@@ -77,7 +79,7 @@ class RecommendationAgent(BaseAgent):
         top_recommendations = scored[:top_k]
         # Chain-of-thought trace: name the signals that drove the ranking so
         # the reasoning is auditable even though the scorer is deterministic.
-        cot_trace: List[str] = []
+        cot_trace: List[str] = list(persona_reasoning)
         if cold_start:
             cot_trace.append("Cold-start path: no prior memory hits, leaning on context overlap.")
         else:
@@ -150,6 +152,33 @@ class RecommendationAgent(BaseAgent):
             f"Top recommendations: {names}. "
             "Ranking combines profile fit, memory evidence, and context overlap."
         )
+
+    @staticmethod
+    def _reason_before_recommend(
+        user_model: Dict[str, Any], payload: Dict[str, Any]
+    ) -> List[str]:
+        """Chain-of-thought: persona and query analysis before ranking."""
+        interests = user_model.get("interests") or []
+        location = user_model.get("location") or "Nigeria"
+        bias = user_model.get("bias") or user_model.get("sentiment_bias") or "balanced"
+        query_blob = str(
+            payload.get("contextual_query", payload.get("context", "")) or ""
+        ).strip()
+        lines = [
+            (
+                f"Reason-Before-Recommend: user in {location} with interests "
+                f"{', '.join(str(i) for i in interests[:6]) or 'unspecified'}; "
+                f"sentiment bias={bias}."
+            )
+        ]
+        if query_blob:
+            lines.append(f"Query intent parsed from: {query_blob[:120]}.")
+        history = payload.get("conversation_history") or []
+        if history:
+            lines.append(
+                f"Multi-turn: {len(history)} prior turn(s) inform context overlap."
+            )
+        return lines
 
     @staticmethod
     def _terms(text: str) -> set[str]:
