@@ -10,6 +10,7 @@ from agents.task_b_pipeline import TaskBPipelineAgent
 from api.deps import api_logger, orchestrator
 from api.task_page import task_endpoint_html
 from core.nigerian_defaults import apply_cold_start_interests
+from core.task_a_inputs import parse_task_a_inputs
 from utils.schemas import UserProfile
 from utils.task_schemas import (
     RecommendationItem,
@@ -55,16 +56,15 @@ def _normalise_language(raw: str | None) -> str:
 
 
 _TASK_A_EXAMPLE = {
-    "user_persona": {
-        "user_id": "judge_demo",
-        "location": "Lagos",
-        "interests": ["street food"],
-        "sentiment_bias": "balanced",
-    },
-    "product_details": {
-        "item_name": "Iya Eba Amala Spot",
-        "item_context": "Saturday lunch, amala soft, about 2k each.",
-    },
+    "user_persona": (
+        "Lagos-based foodie in Yaba, mid-20s, balanced but honest reviewer. "
+        "Cares about value-for-money, wait times, and authentic local taste — "
+        "writes in relatable Nigerian English, not overly formal."
+    ),
+    "product_details": (
+        "Iya Eba Amala Spot — Saturday lunch with a friend. Amala was soft, "
+        "egusi rich without too much oil, about ₦2,000 each, waited roughly 20 minutes."
+    ),
 }
 
 _TASK_B_EXAMPLE = {
@@ -85,7 +85,7 @@ def task_a_user_modeling_get() -> HTMLResponse:
         task_endpoint_html(
             task_name="Task A — User modeling",
             path="/task-a/user-modeling",
-            description="Output: rating + review_reasoning + review_text (two-pass aligned).",
+            description="Input: user_persona + product_details strings. Output: rating + review_text.",
             example_body=_TASK_A_EXAMPLE,
         )
     )
@@ -106,26 +106,13 @@ def task_b_recommendation_get() -> HTMLResponse:
 @router.post("/task-a/user-modeling", response_model=TaskAResponse)
 def task_a_user_modeling(payload: TaskARequest) -> TaskAResponse:
     """
-    Two-pass Task A: Pass 1 locks star rating; Pass 2 writes review aligned to it.
+    Task A: unified persona + product text → star rating + aligned review_text.
     """
-    profile = _persona_to_profile(payload.user_persona)
-    language = _normalise_language(payload.user_persona.language)
-    persona_style = (payload.persona_style or "nigerian_twitter").strip()
-
-    item_context = (payload.product_details.item_context or "").strip()
-    if not item_context and payload.user_persona.history:
-        item_context = payload.user_persona.history.strip()[:1000]
+    parsed = parse_task_a_inputs(payload.user_persona, payload.product_details)
+    user_model = parsed.to_user_model()
 
     try:
-        user_model = orchestrator.prepare_user_model(
-            profile,
-            persona_style=persona_style,
-            tone_notes=payload.user_persona.tone_notes,
-        )
-        user_model["persona_style"] = persona_style
-        user_model["bias"] = profile.sentiment_bias or "balanced"
-
-        query = f"{payload.product_details.item_name} {item_context}".strip()
+        query = f"{parsed.item_name} {parsed.item_context}".strip()
         retrieved = (
             orchestrator.corpus_store.search(query, top_k=3)
             if orchestrator.corpus_store
@@ -134,10 +121,9 @@ def task_a_user_modeling(payload: TaskARequest) -> TaskAResponse:
 
         result = _task_a_agent.run(
             user_model=user_model,
-            item_name=payload.product_details.item_name,
-            item_context=item_context,
+            item_name=parsed.item_name,
+            item_context=parsed.item_context,
             retrieved_examples=retrieved,
-            language=language,
         )
     except ValueError as exc:
         api_logger.warning("task-a validation error: %s", exc)

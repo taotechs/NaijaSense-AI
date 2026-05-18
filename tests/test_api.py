@@ -96,18 +96,13 @@ def test_agent_gateway_recommend_heuristic() -> None:
 
 def test_task_a_user_modeling() -> None:
     payload = {
-        "user_persona": {
-            "user_id": "hackathon_a",
-            "location": "Lagos",
-            "interests": ["street food", "value for money"],
-            "sentiment_bias": "balanced",
-            "tone_notes": "Nigerian twitter tone, mention if worth the money.",
-        },
-        "product_details": {
-            "item_name": "Iya Eba Amala Spot",
-            "item_context": "Saturday lunch, amala soft, egusi rich, about 2k each, 20 min wait.",
-        },
-        "persona_style": "nigerian_twitter",
+        "user_persona": (
+            "Lagos foodie in Yaba, balanced reviewer who cares about value-for-money "
+            "and honest Nigerian tone."
+        ),
+        "product_details": (
+            "Iya Eba Amala Spot — Saturday lunch, amala soft, egusi rich, about ₦2k each, 20 min wait."
+        ),
     }
     response = client.post("/task-a/user-modeling", json=payload)
     body = response.json()

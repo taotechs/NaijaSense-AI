@@ -57,15 +57,12 @@ def _smoke_hackathon_tasks(base_url: str) -> None:
         ta = client.post(
             f"{base_url}/task-a/user-modeling",
             json={
-                "user_persona": {
-                    "user_id": "smoke_a",
-                    "location": "Lagos",
-                    "interests": ["food"],
-                },
-                "product_details": {
-                    "item_name": "Suya Stand",
-                    "item_context": "Spicy, fair price, quick service.",
-                },
+                "user_persona": (
+                    "Lagos foodie, balanced tone, values honest reviews and fair prices."
+                ),
+                "product_details": (
+                    "Suya Stand — spicy skewers, fair price, quick service, slight queue at peak."
+                ),
             },
         )
         ta.raise_for_status()

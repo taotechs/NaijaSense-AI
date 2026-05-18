@@ -45,7 +45,7 @@ def _landing_html(*, api_base: str = "") -> str:
     <h2>Task A — User modeling</h2>
     <p><strong>API (POST):</strong> <a href="{task_a_api}">{task_a_api}</a></p>
     <p><strong>Demo UI:</strong> <a href="{task_a_ui}">{task_a_ui}</a></p>
-    <p>Output: <code>rating</code>, <code>review_reasoning</code>, <code>review_text</code></p>
+    <p>Input: <code>user_persona</code> + <code>product_details</code> · Output: <code>rating</code> + <code>review_text</code></p>
   </div>
 
   <div class="card">

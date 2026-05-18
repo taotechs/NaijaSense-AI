@@ -78,9 +78,9 @@ class TaskATwoPassAgent:
         from core.corpus_index import _terms
 
         profile_terms = _terms(
+            str(user_model.get("persona_narrative", "")),
             str(user_model.get("location", "")),
             " ".join(user_model.get("interests") or []),
-            str(user_model.get("tone", "")),
             str(user_model.get("bias", "")),
         )
         index = get_corpus_index()
