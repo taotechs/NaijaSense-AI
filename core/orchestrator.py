@@ -538,3 +538,28 @@ class NaijaSenseOrchestrator:
             conversational_response=rec_output.get("conversational_response"),
             explainability=explainability,
         )
+
+    # ---- Hackathon submission paths (Task A / Task B) ----------------
+
+    def prepare_user_model(
+        self,
+        profile: UserProfile,
+        *,
+        persona_style: Optional[str] = None,
+        tone_notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Silent history + UI persona merge for hackathon task endpoints."""
+        ctx = self._silent_context_retrieval(profile.user_id)
+        user_model = self.user_modeling_agent.run(
+            {
+                "user_profile": profile,
+                "persona_style": persona_style,
+                "user_history": ctx.history_snippets,
+                "historical_persona": ctx.historical_persona.to_dict(),
+            }
+        )
+        if tone_notes:
+            user_model["tone_notes"] = tone_notes
+        user_model["persona_style"] = persona_style or settings.default_persona_style
+        user_model["historical_signal"] = ctx.historical_persona.to_dict()
+        return user_model
