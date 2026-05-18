@@ -59,8 +59,9 @@ Required accounts (all support free tiers and GitHub sign-in):
 4. Open **Environment Variables** and add:
    - `NEXT_PUBLIC_AGENT_API_URL` = `https://<koyeb-url>/api/agent/v1`
      (e.g. `https://youthful-wynn-taotechs-6715c87e.koyeb.app/api/agent/v1`)
-   - Optional: `NEXT_PUBLIC_API_BASE_URL` — leave **unset** on Vercel so the home page
-     shows same-origin hackathon URLs (`/task-a/...`, `/task-b/...` proxied to Koyeb).
+   - **Do not set** `NEXT_PUBLIC_API_BASE_URL` on Vercel. If it points at Koyeb, the
+     browser calls Koyeb directly and you get CORS errors, “backend unreachable”, or 404.
+     The app uses same-origin `/task-a/...` and `/task-b/...` (rewrites to Koyeb) instead.
 5. Click **Deploy**.
 6. Vercel provides a URL like `https://naijasense-ai.vercel.app`. Save this value.
 

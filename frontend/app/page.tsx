@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { getApiRoot } from "@/lib/api-root";
+import { publicTaskUrl } from "@/lib/api-root";
 
 export default function HomePage() {
-  const apiRoot = getApiRoot();
-  const taskAApi = `${apiRoot}/task-a/user-modeling`;
-  const taskBApi = `${apiRoot}/task-b/recommendation`;
+  const taskAApi = publicTaskUrl("/task-a/user-modeling");
+  const taskBApi = publicTaskUrl("/task-b/recommendation");
 
   return (
     <div className="space-y-8">

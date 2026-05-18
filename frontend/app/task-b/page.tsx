@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { BackendStatus } from "@/components/BackendStatus";
-import { getApiRoot } from "@/lib/api-root";
+import { publicTaskUrl } from "@/lib/api-root";
 import { TaskBResponse, postTaskB } from "@/lib/task-api";
 
 export default function TaskBPage() {
@@ -18,8 +18,7 @@ export default function TaskBPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const apiRoot = getApiRoot();
-  const endpoint = `${apiRoot || ""}/task-b/recommendation`;
+  const endpoint = publicTaskUrl("/task-b/recommendation");
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { BackendStatus } from "@/components/BackendStatus";
-import { getApiRoot } from "@/lib/api-root";
+import { publicTaskUrl } from "@/lib/api-root";
 import { TaskAResponse, postTaskA } from "@/lib/task-api";
 
 function StarRow({ rating }: { rating: number }) {
@@ -33,8 +33,7 @@ export default function TaskAPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const apiRoot = getApiRoot();
-  const endpoint = `${apiRoot || ""}/task-a/user-modeling`;
+  const endpoint = publicTaskUrl("/task-a/user-modeling");
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

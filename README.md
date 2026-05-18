@@ -11,7 +11,9 @@ Use these **two separate URLs** in the DSN × BCT submission form:
 | **Task A — User modeling** | `POST` | `/task-a/user-modeling` | `user_persona` + `product_details` | `rating` (1–5) + `review` |
 | **Task B — Recommendation** | `POST` | `/task-b/recommendation` | `user_persona` (+ optional `context`) | `recommendations[]` + `chain_of_thought` |
 
-**Live submission URLs** (Vercel proxies POST to Koyeb — redeploy both tiers after pulling latest `main`):
+**Live submission URLs** (Vercel proxies POST to Koyeb — redeploy both tiers after pulling latest `main`).
+
+> **Vercel env:** leave `NEXT_PUBLIC_API_BASE_URL` **unset**. If it points at Koyeb, the demo UI calls Koyeb from the browser and shows “backend unreachable” or 404. Only `NEXT_PUBLIC_AGENT_API_URL` is required (for `/unified` and rewrites).
 
 | Field | URL |
 |-------|-----|
