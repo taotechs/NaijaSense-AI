@@ -2,6 +2,29 @@
 
 **Team:** TAOTECH SOLUTIONS
 
+## Hackathon submission (dual-link)
+
+Use these **two separate URLs** in the DSN × BCT submission form:
+
+| Task | Method | Endpoint | Input | Output |
+|------|--------|----------|-------|--------|
+| **Task A — User modeling** | `POST` | `/task-a/user-modeling` | `user_persona` + `product_details` | `rating` (1–5) + `review` |
+| **Task B — Recommendation** | `POST` | `/task-b/recommendation` | `user_persona` (+ optional `context`) | `recommendations[]` + `chain_of_thought` |
+
+**Live submission URLs** (Vercel proxies POST to Koyeb — redeploy both tiers after pulling latest `main`):
+
+| Field | URL |
+|-------|-----|
+| App / landing | [https://naija-sense-ai.vercel.app/](https://naija-sense-ai.vercel.app/) |
+| Task A | `https://naija-sense-ai.vercel.app/task-a/user-modeling` |
+| Task B | `https://naija-sense-ai.vercel.app/task-b/recommendation` |
+| Interactive demo | [https://naija-sense-ai.vercel.app/unified](https://naija-sense-ai.vercel.app/unified) |
+| Backend (direct) | `https://youthful-wynn-taotechs-6715c87e.koyeb.app` |
+
+**Evaluation module:** `evals.py` at repo root (RMSE, ROUGE, BERTScore fallback, NDCG@10, Hit Rate@10, cold-start helpers).
+
+---
+
 NaijaSense AI is a context-aware, multi-agent system designed around two core workloads behind one unified API and a single chat UI branded as the **Behavioral Intelligence Hub**:
 
 - **Task A — User Modeling:** simulate a star rating and a written review for an unseen item, conditioned on a user persona inferred from minimal signals.
@@ -212,9 +235,12 @@ If both commands pass, the stack is functional end-to-end.
 
 | Method | Path | What it does |
 |---|---|---|
+| `GET` | `/` | **Submission landing page** — HTML with links to Task A and Task B. |
+| `POST` | `/task-a/user-modeling` | **Task A (hackathon).** Body: `user_persona`, `product_details`. |
+| `POST` | `/task-b/recommendation` | **Task B (hackathon).** Body: `user_persona`, optional `context`, `top_k`. |
 | `GET` | `/api/v1/health` | Liveness probe; doubles as a cold-start pre-warm for the frontend. |
-| `POST` | `/api/v1/simulate-review` | Task A — explicit endpoint. Body: `user_profile`, `item_data`, `persona_style`. |
-| `POST` | `/api/v1/recommend` | Task B — explicit endpoint. Body: `user_profile`, `candidate_items`, `context`, `top_k`. |
+| `POST` | `/api/v1/simulate-review` | Task A — legacy explicit endpoint. Body: `user_profile`, `item_data`, `persona_style`. |
+| `POST` | `/api/v1/recommend` | Task B — legacy explicit endpoint. Body: `user_profile`, `candidate_items`, `context`, `top_k`. |
 | `POST` | `/api/agent/v1` | **Unified gateway.** Body: `user_persona`, `query`, `include_history?`, `compare_with_no_history?`. Routes to Task A or B via the LLM intent router (with heuristic fallback). |
 | `POST` | `/api/agent/v1/stream` | **Streaming unified gateway.** Same payload as `/v1`, returns `application/x-ndjson` — one JSON event per line (`start` → `route` → `plan` → `step_start`/`step_end` × N → `final`). Powers the live reasoning timeline. |
 | `POST` | `/api/agent/feedback` | Thumbs-up/down feedback. Appends to `data/feedback.jsonl`. |
@@ -237,7 +263,43 @@ If both commands pass, the stack is functional end-to-end.
 | `language` | `string` | The language actually used (after server-side normalisation). |
 | `no_history_variant` | recursive `AgentGatewayResponse` | Present only when `compare_with_no_history=true` in the API request (eval / research use). The Behavioral Intelligence Hub does not request this field. |
 
-### Example — unified gateway (recommended)
+### Example — Task A (hackathon)
+
+```bash
+curl -X POST "http://localhost:8000/task-a/user-modeling" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_persona": {
+      "user_id": "judge_1",
+      "location": "Lagos",
+      "interests": ["street food"],
+      "sentiment_bias": "balanced",
+      "tone_notes": "Value for money; honest Nigerian tone."
+    },
+    "product_details": {
+      "item_name": "Iya Eba Amala Spot",
+      "item_context": "Saturday lunch, amala soft, egusi rich, about 2k each."
+    }
+  }'
+```
+
+### Example — Task B (hackathon)
+
+```bash
+curl -X POST "http://localhost:8000/task-b/recommendation" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_persona": {
+      "user_id": "judge_2",
+      "location": "Yaba, Lagos",
+      "interests": ["food"]
+    },
+    "context": "Cheap weekend eats, not too far.",
+    "top_k": 5
+  }'
+```
+
+### Example — unified gateway (optional demo)
 
 ```bash
 curl -X POST "http://localhost:8000/api/agent/v1" \
@@ -396,6 +458,7 @@ pytest -q
 ├── data/                    # Processed corpus + benchmark results
 ├── data_pipeline/           # Normalisation schemas (Yelp / Amazon / Goodreads)
 ├── docs/                    # Solution paper (SOLUTION_PAPER.md) + template
+├── evals.py                 # Hackathon KPI helpers (wraps evaluation/metrics.py)
 ├── evaluation/              # ROUGE / BERTScore-fallback / RMSE / NDCG / Hit Rate metrics
 ├── frontend/                # Next.js 15 unified chat UI
 ├── memory/                  # In-memory vector store + corpus store + user memory
