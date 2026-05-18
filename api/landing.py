@@ -10,8 +10,10 @@ router = APIRouter(tags=["landing"])
 
 def _landing_html(*, api_base: str = "") -> str:
     base = api_base.rstrip("/")
-    task_a = f"{base}/task-a/user-modeling"
-    task_b = f"{base}/task-b/recommendation"
+    task_a_api = f"{base}/task-a/user-modeling"
+    task_b_api = f"{base}/task-b/recommendation"
+    task_a_ui = "/task-a"
+    task_b_ui = "/task-b"
     docs = f"{base}/docs"
     health = f"{base}/api/v1/health"
 
@@ -41,16 +43,16 @@ def _landing_html(*, api_base: str = "") -> str:
 
   <div class="card">
     <h2>Task A — User modeling</h2>
-    <p><strong>POST</strong> <a href="{task_a}">{task_a}</a></p>
-    <p>Input: <code>user_persona</code> + <code>product_details</code><br/>
-       Output: <code>rating</code> (1–5) + <code>review</code> (Nigerian consumer tone)</p>
+    <p><strong>API (POST):</strong> <a href="{task_a_api}">{task_a_api}</a></p>
+    <p><strong>Demo UI:</strong> <a href="{task_a_ui}">{task_a_ui}</a></p>
+    <p>Output: <code>rating</code>, <code>review_reasoning</code>, <code>review_text</code></p>
   </div>
 
   <div class="card">
     <h2>Task B — Recommendation</h2>
-    <p><strong>POST</strong> <a href="{task_b}">{task_b}</a></p>
-    <p>Input: <code>user_persona</code> (+ optional <code>context</code>)<br/>
-       Output: ranked <code>recommendations</code> + <code>chain_of_thought</code></p>
+    <p><strong>API (POST):</strong> <a href="{task_b_api}">{task_b_api}</a></p>
+    <p><strong>Demo UI:</strong> <a href="{task_b_ui}">{task_b_ui}</a></p>
+    <p>Output: <code>recommendations[]</code> + <code>agent_reasoning</code></p>
   </div>
 
   <div class="card">
