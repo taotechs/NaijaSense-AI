@@ -1,29 +1,31 @@
-"""Task B — 2-stage retrieval (top-30) + LLM agentic reranker."""
+"""Task B — 2-stage retrieval (top-30) + LLM agentic reranker (persona-only input)."""
 
 from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.candidate_catalog import CatalogItem, retrieve_top_k
-from core.nigerian_defaults import apply_cold_start_interests, build_persona_context
+from core.persona_parser import ParsedPersona, parse_task_b_persona
 from models.llm_wrapper import LLMWrapper
-from utils.config import settings
 
-# Cross-domain archetype bridges (food history → entertainment, etc.).
 ARCHETYPE_BRIDGES = {
-    "social": ("entertainment", "experiences", "food"),
+    "social": ("entertainment", "experiences", "food", "movies"),
     "spicy": ("food", "entertainment"),
-    "budget": ("food", "services", "tech", "fashion"),
-    "student": ("food", "tech", "services", "experiences"),
-    "relax": ("wellness", "entertainment", "books"),
+    "budget": ("food", "services", "tech", "fashion", "drinks"),
+    "student": ("food", "tech", "services", "experiences", "movies"),
+    "relax": ("wellness", "entertainment", "books", "movies"),
     "tech": ("tech", "services"),
+    "movie": ("movies", "entertainment", "food"),
+    "drink": ("drinks", "food", "entertainment"),
 }
 
 
 class TaskBPipelineAgent:
-    """Stage-1 retrieval → Stage-2 Reason-Before-Recommend LLM rerank."""
+    """Stage-1 corpus retrieval → Stage-2 Reason-Before-Recommend LLM rerank."""
+
+    DEFAULT_TOP_K = 10
 
     def __init__(self, router_llm: Optional[LLMWrapper] = None) -> None:
         self.llm = router_llm or LLMWrapper(role="router")
@@ -31,39 +33,41 @@ class TaskBPipelineAgent:
     def run(
         self,
         *,
-        user_model: Dict[str, Any],
-        interests: List[str],
-        context: str | None,
-        top_k: int = 5,
-        cold_start: bool = False,
-        cross_domain: bool = False,
-        explicit_titles: Optional[Sequence[str]] = None,
+        user_id: str,
+        persona_narrative: str,
+        top_k: int | None = None,
     ) -> Dict[str, Any]:
-        # Cold-start intercept: empty history indices → demographic priors.
-        if cold_start or not interests:
-            cold_start = True
-            interests, _ = apply_cold_start_interests(interests)
+        parsed = parse_task_b_persona(persona_narrative, user_id=user_id)
+        k = top_k or self.DEFAULT_TOP_K
+        interests = list(parsed.interests)
+        cross_domain = parsed.cold_start or len(set(parsed.domains)) >= 2
 
         if cross_domain:
-            interests = self._expand_cross_domain_interests(interests, context)
+            interests = self._expand_cross_domain_interests(interests, parsed.narrative)
+
+        user_model: Dict[str, Any] = {
+            "user_id": user_id,
+            "location": parsed.location,
+            "bias": "balanced",
+            "persona_narrative": parsed.narrative,
+            "budget_sensitive": parsed.budget_sensitive,
+            "domains": parsed.domains,
+        }
 
         stage1_pool = self._stage1_retrieve(
+            parsed=parsed,
             interests=interests,
-            context=context,
-            cold_start=cold_start,
+            cold_start=parsed.cold_start,
             cross_domain=cross_domain,
-            explicit_titles=explicit_titles,
-            location=str(user_model.get("location") or ""),
-            tone_notes=str(user_model.get("tone_notes") or ""),
         )
 
         recommendations, agent_reasoning = self._stage2_rerank(
             user_model=user_model,
+            parsed=parsed,
             interests=interests,
-            context=context,
             pool=stage1_pool,
-            top_k=top_k,
-            cold_start=cold_start,
+            top_k=k,
+            cold_start=parsed.cold_start,
             cross_domain=cross_domain,
         )
 
@@ -75,119 +79,73 @@ class TaskBPipelineAgent:
     def _stage1_retrieve(
         self,
         *,
+        parsed: ParsedPersona,
         interests: List[str],
-        context: str | None,
         cold_start: bool,
         cross_domain: bool,
-        explicit_titles: Optional[Sequence[str]],
-        location: str = "",
-        tone_notes: str = "",
     ) -> List[Tuple[CatalogItem, float]]:
-        """Fetch top-30 candidates by semantic persona match."""
-        if explicit_titles:
-            from core.candidate_catalog import CATALOG
-
-            by_title = {c.title.lower(): c for c in CATALOG}
-            pool: List[Tuple[CatalogItem, float]] = []
-            for idx, title in enumerate(explicit_titles[:30]):
-                key = title.strip().lower()
-                if key in by_title:
-                    pool.append((by_title[key], 1.0 - idx * 0.01))
-                else:
-                    slug = re.sub(r"[^a-z0-9]+", "_", key)[:40] or f"custom_{idx}"
-                    pool.append(
-                        (
-                            CatalogItem(f"custom_{slug}", title.strip(), "general", ()),
-                            0.5 - idx * 0.01,
-                        )
-                    )
-            if len(pool) >= 3:
-                return pool[:30]
-
+        """Top-30 candidates from corpus metadata (titles/domains unchanged)."""
         return retrieve_top_k(
             interests=interests,
-            context=context,
+            context=parsed.narrative,
             limit=30,
             cold_start=cold_start,
             cross_domain=cross_domain,
-            location=location or None,
-            tone_notes=tone_notes or None,
+            location=parsed.location,
+            tone_notes=None,
         )
 
     def _stage2_rerank(
         self,
         *,
         user_model: Dict[str, Any],
+        parsed: ParsedPersona,
         interests: List[str],
-        context: str | None,
         pool: List[Tuple[CatalogItem, float]],
         top_k: int,
         cold_start: bool,
         cross_domain: bool,
     ) -> Tuple[List[Dict[str, Any]], str]:
-        """Reason-Before-Recommend: LLM reranks stage-1 pool with dynamic weights."""
-        persona_context = build_persona_context(
-            location=user_model.get("location"),
-            interests=interests,
-            history=None,
-            tone_notes=user_model.get("tone_notes") if isinstance(user_model.get("tone_notes"), str) else None,
-            context=context,
-        )
+        """LLM assigns confidence scores; titles/domains come from stage-1 corpus rows."""
+        persona_block = parsed.narrative.strip()[:4000]
 
         lines = [
-            f"- id={item.item_id} | domain={item.domain} | title={item.title} | s1_score={score}"
+            f"- id={item.item_id} | domain={item.domain} | title={item.title} | stage1={score:.3f}"
             for item, score in pool
         ]
         catalog_blob = "\n".join(lines)
 
-        monologue_prefix = [
-            "Reason-Before-Recommend internal monologue:",
-            f"Persona location={user_model.get('location', 'Nigeria')}; "
-            f"interests={', '.join(interests[:8])}; bias={user_model.get('bias', 'balanced')}.",
-        ]
-        if cold_start:
-            monologue_prefix.append(
-                "Cold-start intercept: applied demographic default weights "
-                "(popular localized food, budget tech, weekend experiences)."
-            )
-        if cross_domain:
-            monologue_prefix.append(
-                "Cross-domain: mapped behavioural archetypes (e.g. social/street-food energy) "
-                "to entertainment and experience candidates."
-            )
-        if context and re.search(r"\b(student|campus|budget|cheap|10k)\b", context.lower()):
-            monologue_prefix.append(
-                "Context boost: budget/student intent increases weight on affordable picks."
-            )
+        monologue_seed = self._build_persona_monologue(parsed, interests, cold_start, cross_domain)
 
         system = (
-            "You are a Nigerian recommendation agent. "
-            "First reason about persona-context fit, then rank items. "
+            "You are a Nigerian cross-category recommendation agent (Food, Movies, Drinks, Tech, etc.). "
+            "Read ONLY the user persona narrative — there is no separate search query. "
+            "Reason about lifestyle, financial limits, location, and cross-domain tastes, then rank candidates. "
+            "Use exact item_id values from the list; do not invent or rename titles. "
             "Output ONLY valid JSON: "
             '{"agent_reasoning": "...", "rankings": [{"item_id": "...", "confidence_score": 0.0-1.0}]} '
-            "Include exactly the requested number of top picks in rankings, ordered best-first."
+            f"Return exactly {top_k} items, best-first. confidence_score must reflect persona fit."
         )
         user_msg = (
-            f"{chr(10).join(monologue_prefix)}\n\n"
-            f"PROFILE:\n{persona_context}\n\n"
-            f"CANDIDATES (stage-1 top {len(pool)}):\n{catalog_blob}\n\n"
-            f"Return top {top_k} in rankings with confidence_score in [0,1]."
+            f"{monologue_seed}\n\n"
+            f"USER PERSONA (sole input):\n{persona_block}\n\n"
+            f"CANDIDATES — metadata from corpus (stage-1 top {len(pool)}):\n{catalog_blob}\n\n"
+            f"Rank top {top_k}. agent_reasoning must explain persona-driven weights "
+            "(budget, lifestyle, location) — do not mention a manual query string."
         )
 
         raw = self.llm.generate(user_msg, system=system, temperature=0.25).text.strip()
-        parsed = self._parse_json(raw)
-        id_to_item = {item.item_id: (item, score) for item, score in pool}
+        parsed_json = self._parse_json(raw)
+        id_to_item = {item.item_id: (item, s1) for item, s1 in pool}
 
-        if parsed and parsed.get("rankings"):
-            agent_reasoning = str(parsed.get("agent_reasoning", "")).strip()
-            if not agent_reasoning:
-                agent_reasoning = " ".join(monologue_prefix)
+        if parsed_json and parsed_json.get("rankings"):
+            agent_reasoning = str(parsed_json.get("agent_reasoning", "")).strip() or monologue_seed
             recs: List[Dict[str, Any]] = []
-            for rank in parsed["rankings"][:top_k]:
-                iid = str(rank.get("item_id", ""))
-                conf = float(rank.get("confidence_score", 0.5))
+            for entry in parsed_json["rankings"][:top_k]:
+                iid = str(entry.get("item_id", ""))
+                conf = float(entry.get("confidence_score", 0.5))
                 if iid in id_to_item:
-                    item, s1 = id_to_item[iid]
+                    item, _s1 = id_to_item[iid]
                     recs.append(
                         {
                             "item_id": item.item_id,
@@ -199,8 +157,10 @@ class TaskBPipelineAgent:
             if recs:
                 return recs, agent_reasoning
 
-        # Deterministic fallback: stage-1 order normalized to confidence.
-        agent_reasoning = " ".join(monologue_prefix) + " LLM rerank unavailable; using stage-1 retrieval order."
+        agent_reasoning = (
+            f"{monologue_seed} Stage-2 LLM rerank unavailable; confidence derived from "
+            "stage-1 persona match scores."
+        )
         max_s = max((s for _, s in pool), default=1.0) or 1.0
         recs = []
         for item, s1 in pool[:top_k]:
@@ -215,9 +175,38 @@ class TaskBPipelineAgent:
         return recs, agent_reasoning
 
     @staticmethod
-    def _expand_cross_domain_interests(interests: List[str], context: str | None) -> List[str]:
+    def _build_persona_monologue(
+        parsed: ParsedPersona,
+        interests: List[str],
+        cold_start: bool,
+        cross_domain: bool,
+    ) -> str:
+        lines = [
+            "Reason-Before-Recommend (persona-only evaluation):",
+            f"- Inferred location: {parsed.location}",
+            f"- Lifestyle / category signals: {', '.join(parsed.domains[:6]) or 'general'}",
+            f"- Interest weights: {', '.join(interests[:8])}",
+        ]
+        if parsed.budget_sensitive:
+            lines.append(
+                "- Financial constraint: budget-sensitive persona — down-rank premium-tier items."
+            )
+        else:
+            lines.append("- Financial constraint: no strict budget cap detected from persona.")
+        if cold_start:
+            lines.append(
+                "- Cold-start: sparse persona → demographic priors for popular localized picks."
+            )
+        if cross_domain:
+            lines.append(
+                "- Cross-domain: bridging tastes (e.g. social food energy → movies/experiences)."
+            )
+        return "\n".join(lines)
+
+    @staticmethod
+    def _expand_cross_domain_interests(interests: List[str], persona_narrative: str) -> List[str]:
         expanded = list(interests)
-        blob = f"{' '.join(interests)} {context or ''}".lower()
+        blob = f"{' '.join(interests)} {persona_narrative}".lower()
         for archetype, domains in ARCHETYPE_BRIDGES.items():
             if archetype in blob:
                 expanded.extend(domains)
