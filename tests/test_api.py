@@ -94,6 +94,56 @@ def test_agent_gateway_recommend_heuristic() -> None:
     assert len(body["recommendation"]["recommendations"]) >= 1
 
 
+def test_task_a_user_modeling() -> None:
+    payload = {
+        "user_persona": {
+            "user_id": "hackathon_a",
+            "location": "Lagos",
+            "interests": ["street food", "value for money"],
+            "sentiment_bias": "balanced",
+            "tone_notes": "Nigerian twitter tone, mention if worth the money.",
+        },
+        "product_details": {
+            "item_name": "Iya Eba Amala Spot",
+            "item_context": "Saturday lunch, amala soft, egusi rich, about 2k each, 20 min wait.",
+        },
+        "persona_style": "nigerian_twitter",
+    }
+    response = client.post("/task-a/user-modeling", json=payload)
+    body = response.json()
+    assert response.status_code == 200
+    assert 1.0 <= body["rating"] <= 5.0
+    assert len(body["review"]) > 20
+    assert body["reasoning_steps"]
+
+
+def test_task_b_recommendation() -> None:
+    payload = {
+        "user_persona": {
+            "user_id": "hackathon_b",
+            "location": "Yaba, Lagos",
+            "interests": [],
+            "sentiment_bias": "positive",
+        },
+        "context": "Cheap weekend food spots, not too far.",
+        "top_k": 3,
+    }
+    response = client.post("/task-b/recommendation", json=payload)
+    body = response.json()
+    assert response.status_code == 200
+    assert len(body["recommendations"]) == 3
+    assert body["recommendations"][0]["rank"] == 1
+    assert body["chain_of_thought"]
+    assert "cold_start" in body["scenario_flags"]
+
+
+def test_landing_page() -> None:
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "Task A" in response.text
+    assert "/task-b/recommendation" in response.text
+
+
 def test_simulate_review_validation_error() -> None:
     payload = {
         "user_profile": {"user_id": "u1"},
