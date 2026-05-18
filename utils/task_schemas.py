@@ -1,6 +1,6 @@
-"""Hackathon submission schemas — straightforward Task A / Task B I/O."""
+"""Hackathon submission schemas — Task A / Task B strict I/O."""
 
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -53,10 +53,15 @@ class TaskARequest(BaseModel):
 
 
 class TaskAResponse(BaseModel):
-    rating: float = Field(..., ge=1.0, le=5.0, description="Simulated star rating (1–5).")
-    review: str = Field(..., description="Written review text.")
-    reasoning_steps: List[str] = Field(default_factory=list)
-    persona_breakdown: Dict[str, Any] = Field(default_factory=dict)
+    rating: float = Field(..., ge=1.0, le=5.0)
+    review_reasoning: str = Field(
+        ...,
+        description="Pass-1 rationale linking persona and product facts to the star rating.",
+    )
+    review_text: str = Field(
+        ...,
+        description="Pass-2 review prose aligned to the locked rating.",
+    )
 
 
 class TaskBRequest(BaseModel):
@@ -69,25 +74,20 @@ class TaskBRequest(BaseModel):
     )
     candidate_items: Optional[List[str]] = Field(
         default=None,
-        description="Optional explicit candidate pool; auto-built from persona when omitted.",
+        description="Optional explicit candidate pool; auto-built when omitted.",
     )
 
 
-class RankedRecommendation(BaseModel):
-    rank: int = Field(..., ge=1)
-    item_name: str
-    score: float = Field(..., ge=0.0)
-    explanation: str
+class RecommendationItem(BaseModel):
+    item_id: str
+    title: str
+    domain: str
+    confidence_score: float = Field(..., ge=0.0, le=1.0)
 
 
 class TaskBResponse(BaseModel):
-    recommendations: List[RankedRecommendation]
-    chain_of_thought: List[str] = Field(
-        default_factory=list,
-        description="Reason-Before-Recommend trace (persona analysis before ranking).",
-    )
-    reasoning_steps: List[str] = Field(default_factory=list)
-    scenario_flags: Dict[str, bool] = Field(
-        default_factory=dict,
-        description="cold_start, cross_domain, etc.",
+    recommendations: List[RecommendationItem]
+    agent_reasoning: str = Field(
+        ...,
+        description="Mandatory Reason-Before-Recommend internal monologue for judges.",
     )
