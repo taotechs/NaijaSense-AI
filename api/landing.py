@@ -52,7 +52,7 @@ def _landing_html(*, api_base: str = "") -> str:
     <h2>Task B — Recommendation</h2>
     <p><strong>API (POST):</strong> <a href="{task_b_api}">{task_b_api}</a></p>
     <p><strong>Demo UI:</strong> <a href="{task_b_ui}">{task_b_ui}</a></p>
-    <p>Output: <code>recommendations[]</code> + <code>agent_reasoning</code></p>
+    <p>Input: <code>user_persona.persona</code> only · Output: <code>recommendations[]</code> + <code>agent_reasoning</code></p>
   </div>
 
   <div class="card">

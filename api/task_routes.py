@@ -70,11 +70,12 @@ _TASK_A_EXAMPLE = {
 _TASK_B_EXAMPLE = {
     "user_persona": {
         "user_id": "judge_demo",
-        "location": "Yaba, Lagos",
-        "interests": ["food"],
+        "persona": (
+            "I'm a 22-year-old UNILAG student living in Yaba on a tight ₦10k weekly budget. "
+            "I love affordable street food and jollof spots, weekend Nollywood movies with friends, "
+            "and occasional smoothies — value-for-money matters more than luxury."
+        ),
     },
-    "context": "Cheap weekend food spots nearby.",
-    "top_k": 5,
 }
 
 
@@ -96,7 +97,7 @@ def task_b_recommendation_get() -> HTMLResponse:
         task_endpoint_html(
             task_name="Task B — Recommendation",
             path="/task-b/recommendation",
-            description="Output: recommendations[] + agent_reasoning (2-stage retrieval + rerank).",
+            description="Input: user_persona only. Output: recommendations[] + agent_reasoning.",
             example_body=_TASK_B_EXAMPLE,
         )
     )
@@ -161,35 +162,11 @@ def task_b_recommendation(payload: TaskBRequest) -> TaskBResponse:
     Task B: stage-1 top-30 retrieval → stage-2 LLM Reason-Before-Recommend rerank.
     """
     persona = payload.user_persona
-    cold_start = _is_cold_start(persona)
-    interests, cold_applied = apply_cold_start_interests(list(persona.interests or []))
-    cold_start = cold_start or cold_applied
-
-    profile = _persona_to_profile(persona)
-    profile.interests = interests
-
-    cross_domain = cold_start or len(set(i.lower() for i in interests)) >= 3
-    if payload.context and any(
-        k in payload.context.lower() for k in ("movie", "watch", "tech", "gadget", "read")
-    ):
-        cross_domain = True
 
     try:
-        user_model = orchestrator.prepare_user_model(
-            profile,
-            persona_style="nigerian_twitter",
-            tone_notes=persona.tone_notes,
-        )
-        user_model["tone_notes"] = persona.tone_notes
-
         result = _task_b_agent.run(
-            user_model=user_model,
-            interests=interests,
-            context=payload.context,
-            top_k=payload.top_k,
-            cold_start=cold_start,
-            cross_domain=cross_domain,
-            explicit_titles=payload.candidate_items,
+            user_id=persona.user_id,
+            persona_narrative=persona.persona,
         )
     except ValueError as exc:
         api_logger.warning("task-b validation error: %s", exc)
