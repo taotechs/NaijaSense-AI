@@ -64,18 +64,23 @@ class TaskAResponse(BaseModel):
     )
 
 
+class TaskBUserPersona(BaseModel):
+    """Task B accepts only a comprehensive user persona (hackathon brief)."""
+
+    user_id: str = Field(..., min_length=1, description="Unique user identifier.")
+    persona: str = Field(
+        ...,
+        min_length=20,
+        max_length=8000,
+        description=(
+            "Full profile narrative: lifestyle, budget/financial limits, location, and "
+            "tastes across categories (e.g. Movies, Food, Drinks). No separate query field."
+        ),
+    )
+
+
 class TaskBRequest(BaseModel):
-    user_persona: UserPersona
-    top_k: int = Field(default=5, ge=1, le=20)
-    context: Optional[str] = Field(
-        default=None,
-        max_length=1000,
-        description="Optional free-text query (e.g. cheap food in Yaba).",
-    )
-    candidate_items: Optional[List[str]] = Field(
-        default=None,
-        description="Optional explicit candidate pool; auto-built when omitted.",
-    )
+    user_persona: TaskBUserPersona
 
 
 class RecommendationItem(BaseModel):
