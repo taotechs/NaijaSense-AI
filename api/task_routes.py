@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import HTMLResponse
 
 from api.deps import api_logger, orchestrator
+from api.task_page import task_endpoint_html
 from core.nigerian_defaults import (
     apply_cold_start_interests,
     build_persona_context,
@@ -42,6 +44,64 @@ def _persona_to_profile(persona) -> UserProfile:  # noqa: ANN001 — UserPersona
 def _normalise_language(raw: str | None) -> str:
     val = (raw or "english").lower().strip()
     return val if val in ("english", "pidgin", "yoruba_mix") else "english"
+
+
+_TASK_A_EXAMPLE = {
+    "user_persona": {
+        "user_id": "judge_demo",
+        "location": "Lagos",
+        "interests": ["street food"],
+        "sentiment_bias": "balanced",
+    },
+    "product_details": {
+        "item_name": "Iya Eba Amala Spot",
+        "item_context": "Saturday lunch, amala soft, about 2k each.",
+    },
+}
+
+_TASK_B_EXAMPLE = {
+    "user_persona": {
+        "user_id": "judge_demo",
+        "location": "Yaba, Lagos",
+        "interests": ["food"],
+    },
+    "context": "Cheap weekend food spots nearby.",
+    "top_k": 5,
+}
+
+
+@router.get(
+    "/task-a/user-modeling",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+    summary="Task A — browser info page (use POST to run)",
+)
+def task_a_user_modeling_get() -> HTMLResponse:
+    return HTMLResponse(
+        task_endpoint_html(
+            task_name="Task A — User modeling",
+            path="/task-a/user-modeling",
+            description="Input: user persona + product details. Output: rating (1–5) + review text.",
+            example_body=_TASK_A_EXAMPLE,
+        )
+    )
+
+
+@router.get(
+    "/task-b/recommendation",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+    summary="Task B — browser info page (use POST to run)",
+)
+def task_b_recommendation_get() -> HTMLResponse:
+    return HTMLResponse(
+        task_endpoint_html(
+            task_name="Task B — Recommendation",
+            path="/task-b/recommendation",
+            description="Input: user persona (+ optional context). Output: ranked recommendations.",
+            example_body=_TASK_B_EXAMPLE,
+        )
+    )
 
 
 @router.post(
