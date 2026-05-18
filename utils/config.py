@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     max_history_items: int = 30
     model_name: str = "gpt-4o-mini"
     review_corpus_path: str = "data/processed/review_corpus.jsonl"
+    large_corpus_path: str = "data/large_corpus.jsonl"
+    corpus_index_path: str = "data/processed/corpus_index.json"
+    corpus_query_timeout_sec: float = 2.5
+    # When true, uvicorn startup builds large_corpus if missing (Docker uses entrypoint instead).
+    corpus_build_on_startup: bool = True
 
     # Unified agent / LangChain orchestrator (none | openai | groq)
     orchestrator_provider: str = "none"

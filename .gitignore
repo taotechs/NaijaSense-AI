@@ -12,6 +12,11 @@ venv/
 # Local Kaggle CSV downloads (use script or manual export; do not commit blobs)
 data/raw/kaggle/
 
+# Large evaluation corpus (regenerate: python scripts/build_large_corpus.py --rows 10000)
+data/large_corpus.jsonl
+data/large_corpus.parquet
+data/processed/corpus_index.json
+
 # Runtime-written user feedback log + eval artifacts (regenerated per run)
 data/feedback.jsonl
 data/eval/

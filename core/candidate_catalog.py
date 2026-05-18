@@ -66,16 +66,47 @@ def retrieve_top_k(
     limit: int = 30,
     cold_start: bool = False,
     cross_domain: bool = False,
+    location: str | None = None,
+    tone_notes: str | None = None,
 ) -> List[tuple[CatalogItem, float]]:
     """
-    Stage-1 semantic retrieval: score catalog rows, return top ``limit`` (default 30).
+    Stage-1 retrieval: scan large corpus (10k+) when available, else static catalog.
+    Persona price-tier constraints strip premium items for budget/student profiles.
     """
+    try:
+        from core.corpus_index import get_corpus_index
+
+        pool = get_corpus_index().retrieve_candidates(
+            interests=interests,
+            context=context,
+            location=location,
+            tone_notes=tone_notes,
+            limit=limit,
+            cold_start=cold_start,
+            cross_domain=cross_domain,
+        )
+        if pool:
+            return pool
+    except Exception:
+        pass
+
+    from core.corpus_index import infer_price_tier_constraint, row_violates_tier
+
+    tier = infer_price_tier_constraint(
+        location=location,
+        interests=interests,
+        context=context,
+        tone_notes=tone_notes,
+    )
+
     interest_terms = _terms(" ".join(interests))
     query_terms = _terms(context or "")
     query_terms |= interest_terms
 
     scored: List[tuple[CatalogItem, float]] = []
     for item in CATALOG:
+        if tier == "budget" and "premium" in item.tags:
+            continue
         tag_terms = set(item.tags) | _terms(item.title)
         overlap = len(query_terms & tag_terms)
         domain_hit = 1.0 if any(t in item.domain for t in interest_terms) else 0.0

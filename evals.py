@@ -111,6 +111,35 @@ def cross_domain_candidates(
     return candidates_for_persona(merged, context, cross_domain=True)
 
 
+def check_corpus_loader() -> Dict[str, object]:
+    """Lightweight corpus / index probe for reproducibility (timeout-safe)."""
+    from core.data_loader import resolve_corpus_path, run_with_timeout
+    from core.corpus_index import get_corpus_index
+
+    path = resolve_corpus_path()
+
+    def _probe() -> Dict[str, object]:
+        idx = get_corpus_index()
+        shots = idx.search_few_shots(
+            profile_terms={"food", "student"},
+            product_name="Jollof",
+            product_context="campus budget",
+            k=2,
+        )
+        pool = idx.retrieve_candidates(
+            interests=["food"],
+            context="cheap student lunch",
+            limit=5,
+        )
+        return {
+            "corpus_path": str(path) if path else None,
+            "few_shot_hits": len(shots),
+            "candidate_pool": len(pool),
+        }
+
+    return run_with_timeout(_probe, default={"corpus_path": None, "few_shot_hits": 0, "candidate_pool": 0})
+
+
 def run_mock_validation() -> Dict[str, object]:
     """Execute mock datasets; safe for judges running ``python evals.py``."""
     task_a = score_task_a_batch(
@@ -124,7 +153,12 @@ def run_mock_validation() -> Dict[str, object]:
         MOCK_TASK_B["relevant_lists"],
         k=10,
     )
-    return {"task_a": task_a, "task_b": task_b, "status": "ok"}
+    return {
+        "task_a": task_a,
+        "task_b": task_b,
+        "corpus_loader": check_corpus_loader(),
+        "status": "ok",
+    }
 
 
 if __name__ == "__main__":

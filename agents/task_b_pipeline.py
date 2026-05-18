@@ -53,6 +53,8 @@ class TaskBPipelineAgent:
             cold_start=cold_start,
             cross_domain=cross_domain,
             explicit_titles=explicit_titles,
+            location=str(user_model.get("location") or ""),
+            tone_notes=str(user_model.get("tone_notes") or ""),
         )
 
         recommendations, agent_reasoning = self._stage2_rerank(
@@ -78,6 +80,8 @@ class TaskBPipelineAgent:
         cold_start: bool,
         cross_domain: bool,
         explicit_titles: Optional[Sequence[str]],
+        location: str = "",
+        tone_notes: str = "",
     ) -> List[Tuple[CatalogItem, float]]:
         """Fetch top-30 candidates by semantic persona match."""
         if explicit_titles:
@@ -106,6 +110,8 @@ class TaskBPipelineAgent:
             limit=30,
             cold_start=cold_start,
             cross_domain=cross_domain,
+            location=location or None,
+            tone_notes=tone_notes or None,
         )
 
     def _stage2_rerank(
