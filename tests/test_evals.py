@@ -43,3 +43,11 @@ def test_score_task_b_batch() -> None:
 
 def test_rmse() -> None:
     assert compute_rmse([3.0, 4.0], [3.0, 5.0]) == 0.707107
+
+
+def test_run_mock_validation() -> None:
+    from evals import run_mock_validation
+
+    report = run_mock_validation()
+    assert report["status"] == "ok"
+    assert "ndcg@10" in report["task_b"] or "ndcg@10_explicit" in report["task_b"]

@@ -113,8 +113,8 @@ def test_task_a_user_modeling() -> None:
     body = response.json()
     assert response.status_code == 200
     assert 1.0 <= body["rating"] <= 5.0
-    assert len(body["review"]) > 20
-    assert body["reasoning_steps"]
+    assert len(body["review_text"]) > 20
+    assert len(body["review_reasoning"]) > 10
 
 
 def test_task_b_recommendation() -> None:
@@ -132,9 +132,11 @@ def test_task_b_recommendation() -> None:
     body = response.json()
     assert response.status_code == 200
     assert len(body["recommendations"]) == 3
-    assert body["recommendations"][0]["rank"] == 1
-    assert body["chain_of_thought"]
-    assert "cold_start" in body["scenario_flags"]
+    assert body["recommendations"][0]["item_id"]
+    assert body["recommendations"][0]["title"]
+    assert body["recommendations"][0]["domain"]
+    assert "confidence_score" in body["recommendations"][0]
+    assert len(body["agent_reasoning"]) > 20
 
 
 def test_landing_page() -> None:
