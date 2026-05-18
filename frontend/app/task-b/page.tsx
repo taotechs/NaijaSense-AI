@@ -136,11 +136,10 @@ export default function TaskBPage() {
                       #{idx + 1} {item.title}
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      <span className="capitalize text-brand-400">{item.domain}</span>
+                      <span className="font-medium text-brand-400">Category: {item.domain}</span>
                       {" · "}
-                      confidence {(item.confidence_score * 100).toFixed(1)}%
+                      <span>Confidence: {(item.confidence_score * 100).toFixed(1)}%</span>
                     </p>
-                    <p className="mt-1 font-mono text-[10px] text-slate-500">{item.item_id}</p>
                   </li>
                 ))}
               </ul>
