@@ -32,7 +32,7 @@ class UserPersona(BaseModel):
 
 
 class ProductDetails(BaseModel):
-    """Product / experience being reviewed (Task A)."""
+    """Legacy structured product block (unified agent / older clients)."""
 
     item_name: str = Field(..., min_length=1)
     item_context: Optional[str] = Field(
@@ -44,11 +44,19 @@ class ProductDetails(BaseModel):
 
 
 class TaskARequest(BaseModel):
-    user_persona: UserPersona
-    product_details: ProductDetails
-    persona_style: Optional[str] = Field(
-        default="nigerian_twitter",
-        description="formal | nigerian_twitter",
+    """Task A hackathon body: two unified text fields only."""
+
+    user_persona: str = Field(
+        ...,
+        min_length=20,
+        max_length=8000,
+        description="Comprehensive user profile narrative (location, tone, budget, preferences).",
+    )
+    product_details: str = Field(
+        ...,
+        min_length=10,
+        max_length=4000,
+        description="Product or experience being reviewed (name, price, wait, taste, etc.).",
     )
 
 
