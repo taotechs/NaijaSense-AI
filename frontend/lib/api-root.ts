@@ -29,3 +29,15 @@ export function publicTaskUrl(path: string): string {
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${getPublicOrigin()}${p}`;
 }
+
+/** Same-origin or absolute health probe URL (never use `||` on empty root). */
+export function healthCheckUrl(): string {
+  const root = getApiRoot();
+  if (root) {
+    return `${root}/api/v1/health`;
+  }
+  if (typeof window !== "undefined") {
+    return "/api/v1/health";
+  }
+  return "http://127.0.0.1:8000/api/v1/health";
+}

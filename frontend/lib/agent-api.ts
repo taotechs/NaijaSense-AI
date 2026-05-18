@@ -3,7 +3,7 @@
  * This handles the bridge to the Behavioral Intelligence Hub (FastAPI backend)
  */
 
-import { getApiRoot } from "@/lib/api-root";
+import { healthCheckUrl } from "@/lib/api-root";
 
 // 1. Base Configuration
 const AGENT_URL =
@@ -179,8 +179,7 @@ export async function streamAgentGateway(
 export type BackendHealth = { status: string; service?: string };
 
 export async function getBackendHealth(): Promise<BackendHealth> {
-  const root = getApiRoot() || "http://127.0.0.1:8000";
-  const res = await fetch(`${root}/api/v1/health`, {
+  const res = await fetch(healthCheckUrl(), {
     method: "GET",
     headers: { Accept: "application/json" },
     cache: "no-store",
