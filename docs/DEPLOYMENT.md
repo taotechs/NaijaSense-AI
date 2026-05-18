@@ -56,9 +56,11 @@ Required accounts (all support free tiers and GitHub sign-in):
 3. In the import wizard:
    - **Root Directory**: click **Edit** → select `frontend` (this is the only non-default field).
    - **Framework Preset**: Vercel auto-detects Next.js — leave as-is.
-4. Open **Environment Variables** and add one:
+4. Open **Environment Variables** and add:
    - `NEXT_PUBLIC_AGENT_API_URL` = `https://<koyeb-url>/api/agent/v1`
-     (e.g. `https://naijasense-ai-api-<org>.koyeb.app/api/agent/v1`)
+     (e.g. `https://youthful-wynn-taotechs-6715c87e.koyeb.app/api/agent/v1`)
+   - Optional: `NEXT_PUBLIC_API_BASE_URL` — leave **unset** on Vercel so the home page
+     shows same-origin hackathon URLs (`/task-a/...`, `/task-b/...` proxied to Koyeb).
 5. Click **Deploy**.
 6. Vercel provides a URL like `https://naijasense-ai.vercel.app`. Save this value.
 
@@ -106,8 +108,10 @@ Record these values for documentation and operational handoff:
 | Field | Value |
 |---|---|
 | GitHub repo | `https://github.com/taotechs/NaijaSense-AI.git` |
-| Live demo (frontend) | `https://naijasense-ai.vercel.app` |
-| API endpoint | `https://<koyeb-url>/api/agent/v1` |
+| Live demo (frontend) | `https://naija-sense-ai.vercel.app` |
+| Hackathon Task A (POST) | `https://naija-sense-ai.vercel.app/task-a/user-modeling` |
+| Hackathon Task B (POST) | `https://naija-sense-ai.vercel.app/task-b/recommendation` |
+| API endpoint (unified demo) | `https://<koyeb-url>/api/agent/v1` |
 | Docker setup | Already covered by `Dockerfile` + `docker-compose.yml` in the repo |
 
 ---
