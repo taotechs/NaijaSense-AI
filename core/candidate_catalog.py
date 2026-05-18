@@ -75,6 +75,7 @@ def retrieve_top_k(
     """
     try:
         from core.corpus_index import get_corpus_index
+        from core.recommendation_items import curated_catalog_items, display_domain
 
         pool = get_corpus_index().retrieve_candidates(
             interests=interests,
@@ -90,6 +91,8 @@ def retrieve_top_k(
     except Exception:
         pass
 
+    from core.recommendation_items import curated_catalog_items, display_domain
+
     from core.corpus_index import infer_price_tier_constraint, row_violates_tier
 
     tier = infer_price_tier_constraint(
@@ -103,8 +106,9 @@ def retrieve_top_k(
     query_terms = _terms(context or "")
     query_terms |= interest_terms
 
+    catalog_source = curated_catalog_items()
     scored: List[tuple[CatalogItem, float]] = []
-    for item in CATALOG:
+    for item in catalog_source:
         if tier == "budget" and "premium" in item.tags:
             continue
         tag_terms = set(item.tags) | _terms(item.title)

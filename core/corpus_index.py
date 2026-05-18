@@ -15,6 +15,12 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from core.candidate_catalog import CatalogItem
 from core.corpus_cache_defaults import default_catalog_items, default_few_shots
+from core.recommendation_items import (
+    curated_catalog_items,
+    is_placeholder_item_name,
+    merge_unique_items,
+    resolve_display_item,
+)
 from core.data_loader import (
     iter_corpus_rows,
     resolve_corpus_path,
@@ -102,18 +108,9 @@ def _score_row(
     return score
 
 
-def _row_to_catalog_item(row: Dict[str, Any], idx: int) -> CatalogItem:
-    iid = str(row.get("item_id") or "").strip()
-    if not iid:
-        slug = re.sub(r"[^a-z0-9]+", "_", str(row.get("item_name", f"item_{idx}")).lower())[:48]
-        iid = f"corpus_{slug}_{idx}"
-    tags = tuple(_row_tags(row))
-    return CatalogItem(
-        item_id=iid,
-        title=str(row.get("item_name", "Unknown item")),
-        domain=str(row.get("item_domain", row.get("domain", "general"))),
-        tags=tags,
-    )
+def _row_to_catalog_item(row: Dict[str, Any], idx: int) -> Optional[CatalogItem]:
+    """Task B only — returns None for review-placeholder rows."""
+    return resolve_display_item(row, idx=idx)
 
 
 class LargeCorpusIndex:
@@ -193,29 +190,47 @@ class LargeCorpusIndex:
         query_terms = interest_terms | _terms(context or "", location or "")
 
         def _run() -> List[Tuple[CatalogItem, float]]:
+            # Always seed with curated product catalog (real item titles).
+            scored: List[Tuple[CatalogItem, float]] = []
+            for item in curated_catalog_items():
+                tag_terms = set(item.tags) | _terms(item.title, item.domain)
+                overlap = len(query_terms & tag_terms)
+                base = 0.45 + overlap * 0.12
+                if cold_start and item.domain in ("Food", "Experience", "Service"):
+                    base += 0.2
+                if cross_domain and item.domain in ("Movie", "Experience", "Drink"):
+                    base += 0.15
+                scored.append((item, round(base, 4)))
+
             hits = self._retrieve_rows(
                 query_terms=query_terms,
                 domain_terms=interest_terms,
-                limit=limit * 3,
+                limit=limit * 4,
                 rating_hint=None,
                 unique_items=True,
                 tier_filter=tier,
             )
-            scored: List[Tuple[CatalogItem, float]] = []
             for score, row in hits:
+                if is_placeholder_item_name(str(row.get("item_name", ""))):
+                    # Still try text-based inference inside resolve_display_item.
+                    pass
                 item = _row_to_catalog_item(row, len(scored))
+                if item is None:
+                    continue
                 adj = score
-                if cold_start and item.domain in ("food", "experiences", "services", "restaurant"):
+                if cold_start and item.domain in ("Food", "Experience", "Service"):
                     adj += 0.35
-                if cross_domain and item.domain in ("entertainment", "experiences", "books"):
+                if cross_domain and item.domain in ("Movie", "Experience", "Drink"):
                     adj += 0.2
                 if "budget" in item.tags or "student" in item.tags:
                     adj += 0.1
                 scored.append((item, round(adj, 4)))
-            scored.sort(key=lambda x: x[1], reverse=True)
-            return scored[:limit]
 
-        fallback = [(c, 0.5 - i * 0.01) for i, c in enumerate(default_catalog_items()[:limit])]
+            return merge_unique_items(scored, limit=limit)
+
+        fallback = [
+            (c, 0.5 - i * 0.01) for i, c in enumerate(curated_catalog_items()[:limit])
+        ]
         result = run_with_timeout(_run, default=fallback)
         return result if result else fallback
 
@@ -274,7 +289,13 @@ class LargeCorpusIndex:
             row = rows[idx]
             if tier_filter and row_violates_tier(row, tier_filter):
                 continue
-            key = str(row.get("item_id") or row.get("item_name", "")).lower()
+            if is_placeholder_item_name(str(row.get("item_name", ""))):
+                resolved = resolve_display_item(row)
+                if resolved is None:
+                    continue
+                key = resolved.title.lower()
+            else:
+                key = str(row.get("item_name", "")).lower()
             if unique_items and key in seen:
                 continue
             score = _score_row(row, query_terms, domain_terms=domain_terms, rating_hint=rating_hint)
@@ -308,7 +329,13 @@ class LargeCorpusIndex:
         for row in timed_iter(iter_corpus_rows(path), deadline=deadline):
             if tier_filter and row_violates_tier(row, tier_filter):
                 continue
-            key = str(row.get("item_id") or row.get("item_name", "")).lower()
+            if is_placeholder_item_name(str(row.get("item_name", ""))):
+                resolved = resolve_display_item(row)
+                if resolved is None:
+                    continue
+                key = resolved.title.lower()
+            else:
+                key = str(row.get("item_name", "")).lower()
             if unique_items and key in seen:
                 continue
             score = _score_row(row, query_terms, domain_terms=domain_terms, rating_hint=rating_hint)

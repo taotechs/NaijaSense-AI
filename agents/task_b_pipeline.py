@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core.candidate_catalog import CatalogItem, retrieve_top_k
 from core.persona_parser import ParsedPersona, parse_task_b_persona
+from core.recommendation_items import display_domain, is_placeholder_item_name
 from models.llm_wrapper import LLMWrapper
 
 ARCHETYPE_BRIDGES = {
@@ -137,23 +138,23 @@ class TaskBPipelineAgent:
         raw = self.llm.generate(user_msg, system=system, temperature=0.25).text.strip()
         parsed_json = self._parse_json(raw)
         id_to_item = {item.item_id: (item, s1) for item, s1 in pool}
+        title_to_item = {item.title.strip().lower(): (item, s1) for item, s1 in pool}
 
         if parsed_json and parsed_json.get("rankings"):
             agent_reasoning = str(parsed_json.get("agent_reasoning", "")).strip() or monologue_seed
             recs: List[Dict[str, Any]] = []
             for entry in parsed_json["rankings"][:top_k]:
-                iid = str(entry.get("item_id", ""))
+                iid = str(entry.get("item_id", "")).strip()
                 conf = float(entry.get("confidence_score", 0.5))
-                if iid in id_to_item:
-                    item, _s1 = id_to_item[iid]
-                    recs.append(
-                        {
-                            "item_id": item.item_id,
-                            "title": item.title,
-                            "domain": item.domain,
-                            "confidence_score": round(min(1.0, max(0.0, conf)), 4),
-                        }
-                    )
+                item_match = id_to_item.get(iid)
+                if item_match is None and iid:
+                    # LLM sometimes echoes internal ids — match by title if provided.
+                    title_key = str(entry.get("title", iid)).strip().lower()
+                    if not is_placeholder_item_name(title_key):
+                        item_match = title_to_item.get(title_key)
+                if item_match:
+                    item, _s1 = item_match
+                    recs.append(self._format_rec(item, conf))
             if recs:
                 return recs, agent_reasoning
 
@@ -164,15 +165,21 @@ class TaskBPipelineAgent:
         max_s = max((s for _, s in pool), default=1.0) or 1.0
         recs = []
         for item, s1 in pool[:top_k]:
-            recs.append(
-                {
-                    "item_id": item.item_id,
-                    "title": item.title,
-                    "domain": item.domain,
-                    "confidence_score": round(min(1.0, s1 / max_s), 4),
-                }
-            )
+            recs.append(self._format_rec(item, s1 / max_s))
         return recs, agent_reasoning
+
+    @staticmethod
+    def _format_rec(item: CatalogItem, confidence: float) -> Dict[str, Any]:
+        """Ensure API cards use catalog titles/categories, not raw corpus markers."""
+        title = (item.title or "").strip()
+        if is_placeholder_item_name(title):
+            title = "Recommended local pick"
+        return {
+            "item_id": item.item_id,
+            "title": title,
+            "domain": display_domain(item.domain),
+            "confidence_score": round(min(1.0, max(0.0, float(confidence))), 4),
+        }
 
     @staticmethod
     def _build_persona_monologue(
