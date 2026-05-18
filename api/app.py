@@ -7,13 +7,18 @@ from fastapi.responses import JSONResponse
 
 from api.agent_routes import router as agent_router
 from api.feedback_routes import router as feedback_router
+from api.landing import router as landing_router
 from api.routes import router
+from api.task_routes import router as task_router
 from utils.config import settings
 
 app = FastAPI(
     title="NaijaSense AI",
-    description="Context-aware user simulation and recommendation service.",
-    version="1.0.0",
+    description=(
+        "DSN × BCT LLM Agent Challenge — Task A (user modeling) and Task B "
+        "(recommendation) with dual submission endpoints."
+    ),
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -24,6 +29,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(landing_router)
+app.include_router(task_router)
 app.include_router(router, prefix=settings.api_prefix)
 app.include_router(agent_router, prefix="/api/agent")
 app.include_router(feedback_router, prefix="/api/agent")
