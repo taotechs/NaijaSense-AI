@@ -1,14 +1,10 @@
 import Link from "next/link";
-
-// On Vercel, leave NEXT_PUBLIC_API_BASE_URL unset so links use same-origin
-// rewrites (see frontend/next.config.ts). Local dev: set to http://127.0.0.1:8000
-const apiBase =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
+import { getApiRoot } from "@/lib/api-root";
 
 export default function HomePage() {
-  const taskA = `${apiBase}/task-a/user-modeling`;
-  const taskB = `${apiBase}/task-b/recommendation`;
-  const docs = `${apiBase}/docs`;
+  const apiRoot = getApiRoot();
+  const taskAApi = `${apiRoot}/task-a/user-modeling`;
+  const taskBApi = `${apiRoot}/task-b/recommendation`;
 
   return (
     <div className="space-y-8">
@@ -17,12 +13,11 @@ export default function HomePage() {
           Dual-link submission
         </p>
         <h2 className="mt-2 text-xl font-semibold text-slate-100">
-          Two endpoints for the hackathon form
+          Two tasks — each with its own demo screen
         </h2>
         <p className="mt-2 text-sm text-slate-400">
-          Submit separate URLs for Task A (user modeling) and Task B
-          (recommendation). Each accepts a straightforward JSON body and returns
-          the expected output shape.
+          Submit the API URLs in the hackathon form. Use the demo buttons below to
+          test Task A and Task B in the browser (no Swagger required).
         </p>
       </section>
 
@@ -30,50 +25,46 @@ export default function HomePage() {
         <article className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
           <h3 className="font-semibold text-slate-100">Task A — User modeling</h3>
           <p className="mt-2 text-xs text-slate-400">
-            Input: user persona + product details. Output: rating + review.
+            Persona + product → rating + review.
           </p>
-          <p className="mt-3 break-all font-mono text-[11px] text-brand-400">
-            POST {taskA}
+          <p className="mt-2 break-all font-mono text-[10px] text-slate-500">
+            POST {taskAApi || "/task-a/user-modeling"}
           </p>
           <Link
-            href={docs}
-            className="mt-3 inline-block text-sm text-brand-500 hover:underline"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/task-a"
+            className="mt-4 inline-flex rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-500"
           >
-            Try in Swagger →
+            Open Task A demo →
           </Link>
         </article>
 
         <article className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
           <h3 className="font-semibold text-slate-100">Task B — Recommendation</h3>
           <p className="mt-2 text-xs text-slate-400">
-            Input: user persona. Output: ranked list + chain-of-thought.
+            Persona → ranked list + chain-of-thought.
           </p>
-          <p className="mt-3 break-all font-mono text-[11px] text-brand-400">
-            POST {taskB}
+          <p className="mt-2 break-all font-mono text-[10px] text-slate-500">
+            POST {taskBApi || "/task-b/recommendation"}
           </p>
           <Link
-            href={docs}
-            className="mt-3 inline-block text-sm text-brand-500 hover:underline"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/task-b"
+            className="mt-4 inline-flex rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-500"
           >
-            Try in Swagger →
+            Open Task B demo →
           </Link>
         </article>
       </div>
 
       <section className="rounded-xl border border-dashed border-slate-700 bg-slate-950/50 p-5">
-        <h3 className="text-sm font-medium text-slate-300">Interactive demo</h3>
+        <h3 className="text-sm font-medium text-slate-300">Unified agent (optional)</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Full agentic hub with live reasoning timeline (unified gateway).
+          One chat that auto-routes between Task A and B with a live reasoning timeline.
         </p>
         <Link
           href="/unified"
-          className="mt-3 inline-flex items-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-500"
+          className="mt-3 inline-block text-sm text-brand-500 hover:underline"
         >
-          Open Behavioral Intelligence Hub
+          Open Behavioral Intelligence Hub →
         </Link>
       </section>
     </div>
