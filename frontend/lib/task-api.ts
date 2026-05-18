@@ -49,9 +49,8 @@ export type TaskAPayload = {
 
 export type TaskAResponse = {
   rating: number;
-  review: string;
-  reasoning_steps: string[];
-  persona_breakdown: Record<string, unknown>;
+  review_reasoning: string;
+  review_text: string;
 };
 
 export function postTaskA(payload: TaskAPayload) {
@@ -74,17 +73,15 @@ export type TaskBPayload = {
 };
 
 export type TaskBRecommendation = {
-  rank: number;
-  item_name: string;
-  score: number;
-  explanation: string;
+  item_id: string;
+  title: string;
+  domain: string;
+  confidence_score: number;
 };
 
 export type TaskBResponse = {
   recommendations: TaskBRecommendation[];
-  chain_of_thought: string[];
-  reasoning_steps: string[];
-  scenario_flags: Record<string, boolean>;
+  agent_reasoning: string;
 };
 
 export function postTaskB(payload: TaskBPayload) {
