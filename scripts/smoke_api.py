@@ -51,7 +51,44 @@ def _print_recommend(label: str, resp: dict[str, Any]) -> None:
     print()
 
 
+def _smoke_hackathon_tasks(base_url: str) -> None:
+    """Quick check of dual-link submission endpoints."""
+    with httpx.Client(timeout=60.0) as client:
+        ta = client.post(
+            f"{base_url}/task-a/user-modeling",
+            json={
+                "user_persona": {
+                    "user_id": "smoke_a",
+                    "location": "Lagos",
+                    "interests": ["food"],
+                },
+                "product_details": {
+                    "item_name": "Suya Stand",
+                    "item_context": "Spicy, fair price, quick service.",
+                },
+            },
+        )
+        ta.raise_for_status()
+        tb = client.post(
+            f"{base_url}/task-b/recommendation",
+            json={
+                "user_persona": {"user_id": "smoke_b", "interests": []},
+                "context": "Weekend food in Lagos",
+                "top_k": 3,
+            },
+        )
+        tb.raise_for_status()
+    print("Hackathon Task A rating:", ta.json().get("rating"))
+    print("Hackathon Task B top pick:", tb.json()["recommendations"][0]["item_name"])
+    print()
+
+
 def main(base_url: str) -> None:
+    print("=" * 70)
+    print("HACKATHON — Task A & Task B endpoints")
+    print("=" * 70)
+    _smoke_hackathon_tasks(base_url)
+
     persona = {
         "user_id": "u_smoke_1",
         "location": "Lagos",
