@@ -51,15 +51,9 @@ export type TaskBPayload = {
   };
 };
 
-export type TaskBRecommendation = {
-  item_id: string;
-  title: string;
-  domain: string;
-  confidence_score: number;
-};
-
 export type TaskBResponse = {
-  recommendations: TaskBRecommendation[];
+  /** Single flowing paragraph of recommendation sentences. */
+  recommendations: string;
   agent_reasoning: string;
 };
 
