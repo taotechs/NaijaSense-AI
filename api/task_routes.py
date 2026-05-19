@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import HTMLResponse
 
 from agents.task_a_two_pass import TaskATwoPassAgent
+from agents.task_b_gemini import TaskBRerankError
 from agents.task_b_pipeline import TaskBPipelineAgent
 from api.deps import api_logger, orchestrator
 from api.task_page import task_endpoint_html
@@ -157,6 +158,12 @@ def task_b_recommendation(payload: TaskBRequest) -> TaskBResponse:
     except ValueError as exc:
         api_logger.warning("task-b validation error: %s", exc)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except TaskBRerankError as exc:
+        api_logger.error("task-b gemini rerank failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
     except Exception as exc:  # pragma: no cover
         api_logger.exception("task-b failure: %s", exc)
         raise HTTPException(
