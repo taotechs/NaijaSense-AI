@@ -3,12 +3,39 @@
 from core.recommendation_items import (
     canonical_item_title,
     is_placeholder_item_name,
+    looks_like_review_snippet,
     merge_unique_items,
+    prompt_display_title,
     resolve_display_item,
     curated_catalog_items,
 )
 from core.candidate_catalog import CatalogItem
 from core.corpus_index import LargeCorpusIndex
+
+
+def test_review_snippet_detected_and_sanitized() -> None:
+    assert looks_like_review_snippet("One of the best, Food porn...")
+    assert looks_like_review_snippet("I wanted to love it, but...")
+    clean = prompt_display_title(
+        "I wanted to love it, but the portions were tiny",
+        domain="movies",
+        context_text="sci-fi thriller plot twist",
+    )
+    assert not looks_like_review_snippet(clean)
+    assert "but the portions" not in clean.lower()
+
+
+def test_resolve_display_item_replaces_snippet_name() -> None:
+    row = {
+        "item_id": "hf_amz_99",
+        "item_name": "One of the best, Food porn...",
+        "item_domain": "restaurant",
+        "text": "Wood-fired white pizza with burrata, crisp crust.",
+    }
+    item = resolve_display_item(row)
+    assert item is not None
+    assert not looks_like_review_snippet(item.title)
+    assert "food porn" not in item.title.lower()
 
 
 def test_canonical_title_collapses_variants() -> None:

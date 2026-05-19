@@ -58,6 +58,31 @@ _TEXT_TITLE_PATTERNS: List[Tuple[re.Pattern[str], str, str]] = [
     (re.compile(r"\b(spa|massage)\b", re.I), "Relaxation Spa Session", "wellness"),
 ]
 
+# Opinion / review prose mistaken for product titles in corpus rows.
+_REVIEW_SNIPPET_TITLE_RE = re.compile(
+    r"^(one of the|i wanted|i loved|i hate|i thought|food porn|would not|wouldn't|"
+    r"don't|do not|never again|so good|so bad|amazing|terrible|disappointed|"
+    r"highly recommend|not worth|waste of|overrated|underrated)\b",
+    re.I,
+)
+_REVIEW_SNIPPET_MID_RE = re.compile(
+    r"\b(but\.\.\.|however,|although |because |though |'\s*\w|\"\s*\w)",
+    re.I,
+)
+
+_DOMAIN_FALLBACK_TITLE = {
+    "Food": "Premium Local Restaurant",
+    "Movie": "A Thrilling Sci-Fi Film",
+    "Drink": "Specialty Drinks Spot",
+    "Books": "A Compelling Read",
+    "Tech": "Practical Tech Pick",
+    "Wellness": "Relaxing Wellness Experience",
+    "Fashion": "Stylish Fashion Find",
+    "Experience": "Memorable Local Experience",
+    "Service": "Trusted Local Service",
+    "General": "Recommended Local Pick",
+}
+
 _DOMAIN_LABELS = {
     "food": "Food",
     "restaurant": "Food",
@@ -109,6 +134,52 @@ def display_domain(raw: str) -> str:
     return key.capitalize() if key else "General"
 
 
+def looks_like_review_snippet(title: str) -> bool:
+    """True when a string looks like review comment text, not a product/venue name."""
+    t = (title or "").strip()
+    if not t or len(t) < 4:
+        return False
+    if t.startswith(('"', "'", "“", "”", "(")):
+        return True
+    if "..." in t or "…" in t:
+        return True
+    if _REVIEW_SNIPPET_TITLE_RE.search(t):
+        return True
+    if _REVIEW_SNIPPET_MID_RE.search(t):
+        return True
+    if t.count("!") >= 2 or t.count("?") >= 2:
+        return True
+    words = t.split()
+    if len(words) > 12:
+        return True
+    if len(words) >= 6 and t[0].islower():
+        return True
+    return False
+
+
+def prompt_display_title(
+    title: str,
+    *,
+    domain: str = "General",
+    context_text: str = "",
+) -> str:
+    """
+    Clean title for Task B prompts and generated prose.
+    Never pass raw review snippets through as display names.
+    """
+    base = canonical_item_title(title)
+    if base and not looks_like_review_snippet(base):
+        return base
+
+    blob = " ".join(filter(None, [context_text, title, " ".join(_tokenize(title, domain))]))
+    inferred = infer_title_from_text(blob)
+    if inferred:
+        return inferred[0]
+
+    label = display_domain(domain)
+    return _DOMAIN_FALLBACK_TITLE.get(label, _DOMAIN_FALLBACK_TITLE["General"])
+
+
 def infer_title_from_text(text: str) -> Optional[Tuple[str, str]]:
     blob = text or ""
     for pattern, title, domain in _TEXT_TITLE_PATTERNS:
@@ -138,8 +209,8 @@ def resolve_display_item(row: Dict[str, Any], *, idx: int = 0) -> Optional[Catal
         title = inferred[0] if inferred else raw_name[:60]
         domain = inferred[1] if inferred else raw_domain
 
-    title = title.strip()
-    if is_placeholder_item_name(title):
+    title = prompt_display_title(title, domain=domain, context_text=text)
+    if is_placeholder_item_name(title) or looks_like_review_snippet(title):
         return None
 
     iid = str(row.get("item_id") or "").strip()

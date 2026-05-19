@@ -8,7 +8,12 @@ from typing import List, Tuple
 
 from agents.task_b_errors import TaskBRerankError
 from core.candidate_catalog import CatalogItem
-from core.recommendation_items import canonical_item_title, display_domain
+from core.recommendation_items import (
+    canonical_item_title,
+    display_domain,
+    looks_like_review_snippet,
+    prompt_display_title,
+)
 from models.llm_wrapper import LLMWrapper
 from utils.config import settings
 from utils.task_schemas import TaskBRankResponse, TaskBResponse
@@ -29,20 +34,34 @@ _ROUTER_SYSTEM = (
     "You are a Nigerian cross-category recommendation ranker. Read ONLY the persona - "
     "no separate search query. Reason about budget, location, and lifestyle, then rank "
     "exactly {top_k} item_id values from the candidate list (best-first). "
+    "Corpus titles may be messy review excerpts; rank by item_id and domain fit only. "
+    "In agent_reasoning and brief_why, never quote review snippets as product names. "
     "Output ONLY valid JSON: "
     '{{"agent_reasoning": "2-4 sentences on strategy", '
     '"rankings": [{{"item_id": "...", "brief_why": "short"}}]}} '
     "Use item_id values exactly as given; do not invent ids."
 )
 
+_GENERATOR_TITLE_RULES = (
+    " STRICT NAME PARSING: Each locked pick has a Display name. In your paragraph you must "
+    "use only that Display name (or a natural short paraphrase of the same kind of thing, "
+    "e.g. 'a wood-fired pizza spot', 'a gripping sci-fi film'). "
+    "Never paste raw review quotes, user comments, ellipses (...), parenthetical notes, or "
+    "first-person opinion lines (e.g. 'One of the best', 'I wanted to love it but', 'Food porn') "
+    "as if they were product, book, or restaurant names. "
+    "If a display name looks like review text, infer a clean realistic title from domain "
+    "(restaurant, film, book, gadget) instead."
+)
+
 _GENERATOR_SYSTEM = (
     "You are a Nigerian lifestyle recommendation writer. Write ONE tight paragraph "
     "({sentence_count} sentences max). Rules: no numbered list, no bullets, no markdown; "
-    "mention each locked pick exactly ONCE using its display title; no repeated venue names; "
+    "mention each locked pick exactly ONCE using its Display name; no repeated venue names; "
     "no general life/career/education advice (do not say whether someone should learn AI, "
     "change careers, etc.); only describe why each pick fits as a lifestyle/product choice. "
     "Stay on-topic to the locked picks only - no digressions. "
-    "Return ONLY the paragraph text.\n\n"
+    + _GENERATOR_TITLE_RULES
+    + " Return ONLY the paragraph text.\n\n"
     + _GENERATOR_FEW_SHOT
 )
 
@@ -237,7 +256,12 @@ def _dedupe_locked_by_title(items: List[CatalogItem]) -> List[CatalogItem]:
 
 
 def _display_title(item: CatalogItem) -> str:
-    return canonical_item_title(item.title)
+    tag_context = " ".join(item.tags) if item.tags else ""
+    return prompt_display_title(
+        item.title or "",
+        domain=item.domain,
+        context_text=tag_context,
+    )
 
 
 def _generator_paragraph(
@@ -252,13 +276,14 @@ def _generator_paragraph(
         raise TaskBRerankError("No locked picks for paragraph generation.")
 
     pick_lines = "\n".join(
-        f"- {_display_title(item)} ({display_domain(item.domain)})" for item in locked_picks
+        f"- Display: {_display_title(item)} | domain={display_domain(item.domain)} | item_id={item.item_id}"
+        for item in locked_picks
     )
     sentence_count = min(top_k, len(locked_picks))
     llm = LLMWrapper(role="generator")
     user_msg = (
         f"USER PERSONA:\n{user_persona}\n\n"
-        f"LOCKED PICKS (mention each by title - do not add other venues):\n{pick_lines}\n\n"
+        f"LOCKED PICKS (use each Display name only - never raw review quotes as names):\n{pick_lines}\n\n"
         "Write the recommendation paragraph now."
     )
     system = _GENERATOR_SYSTEM.format(sentence_count=sentence_count)
@@ -269,7 +294,10 @@ def _generator_paragraph(
 
     for attempt in range(2):
         raw = llm.generate(
-            user_msg if attempt == 0 else user_msg + "\n\nREMINDER: Use ONLY the locked pick titles above.",
+            user_msg
+            if attempt == 0
+            else user_msg
+            + "\n\nREMINDER: Use ONLY the Display names above. No review snippets as product names.",
             system=system,
             temperature=0.55 if attempt == 0 else 0.45,
             max_tokens=520,
@@ -279,7 +307,8 @@ def _generator_paragraph(
             if _paragraph_mentions_picks(paragraph, locked_picks, min_hits=max(1, len(locked_picks) - 1)):
                 if not _paragraph_has_title_repetition(paragraph, locked_picks):
                     if not _paragraph_has_advisory_digression(paragraph, advisory_only_mode):
-                        return paragraph
+                        if not _paragraph_contains_review_snippets(paragraph, locked_picks):
+                            return paragraph
 
     raise TaskBRerankError("Generator failed to produce a grounded recommendation paragraph.")
 
@@ -289,6 +318,26 @@ _ADVISORY_DIGRESSION_RE = re.compile(
     r"learning ai|artificial intelligence is|career advice)\b",
     re.I,
 )
+
+
+def _paragraph_contains_review_snippets(paragraph: str, picks: List[CatalogItem]) -> bool:
+    """Reject output that reuses raw corpus review text as a name."""
+    lower = paragraph.lower()
+    if "..." in paragraph or "food porn" in lower:
+        return True
+    if re.search(r"\bi wanted to (love|like|try)\b", lower):
+        return True
+    if re.search(r"\bone of the best\b", lower) and not re.search(
+        r"\bone of the best (restaurants|spots|films|books|places)\b", lower
+    ):
+        return True
+    for item in picks:
+        raw = (item.title or "").strip()
+        if raw and looks_like_review_snippet(raw):
+            snippet = raw.lower()[:48]
+            if snippet in lower:
+                return True
+    return False
 
 
 def _paragraph_has_advisory_digression(paragraph: str, advisory_only_mode: bool) -> bool:

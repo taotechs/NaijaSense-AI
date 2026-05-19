@@ -9,6 +9,7 @@ from agents.task_b_errors import TaskBRerankError
 from agents.task_b_rerank import rerank_task_b
 from core.candidate_catalog import CatalogItem, retrieve_top_k
 from core.persona_parser import ParsedPersona, parse_task_b_persona
+from core.recommendation_items import prompt_display_title
 from core.task_b_diversify import diversify_stage1_pool
 from utils.config import settings
 from utils.task_schemas import TaskBResponse
@@ -126,7 +127,7 @@ class TaskBPipelineAgent:
         monologue_seed = self._build_persona_monologue(parsed, interests, cold_start, cross_domain)
 
         candidate_items_list = "\n".join(
-            f"- item_id={item.item_id} | domain={item.domain} | title={item.title} | stage1_score={score:.3f}"
+            f"- item_id={item.item_id} | domain={item.domain} | display={prompt_display_title(item.title, domain=item.domain, context_text=' '.join(item.tags))} | stage1_score={score:.3f}"
             for item, score in pool
         )
 
