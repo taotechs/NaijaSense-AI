@@ -31,3 +31,4 @@ frontend/.env*.local
 # OS/editor noise
 .DS_Store
 Thumbs.db
+~$*
