@@ -113,12 +113,12 @@ export default function TaskBPage() {
           <h3 className="text-lg font-semibold">Output</h3>
           {!result && (
             <p className="text-sm text-slate-400">
-              Submit a persona to see corpus-backed recommendations with LLM confidence scores.
+              Submit a persona to see a personalized recommendation paragraph grounded in the corpus.
             </p>
           )}
           {result && (
             <>
-              <details className="rounded-xl border border-slate-800 bg-slate-900/50 p-3" open>
+              <details className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
                 <summary className="cursor-pointer text-sm font-medium text-slate-300">
                   agent_reasoning
                 </summary>
@@ -126,23 +126,14 @@ export default function TaskBPage() {
                   {result.agent_reasoning}
                 </p>
               </details>
-              <ul className="space-y-3">
-                {result.recommendations.map((item, idx) => (
-                  <li
-                    key={item.item_id}
-                    className="rounded-xl border border-slate-800 bg-slate-900/80 p-3"
-                  >
-                    <p className="text-sm font-medium text-slate-100">
-                      #{idx + 1} {item.title}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      <span className="font-medium text-brand-400">Category: {item.domain}</span>
-                      {" · "}
-                      <span>Confidence: {(item.confidence_score * 100).toFixed(1)}%</span>
-                    </p>
-                  </li>
-                ))}
-              </ul>
+              <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-brand-500">
+                  Recommendations
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-slate-100">
+                  {result.recommendations}
+                </p>
+              </div>
             </>
           )}
         </div>
