@@ -69,7 +69,7 @@ _TASK_A_EXAMPLE = {
 
 _TASK_B_EXAMPLE = {
     "user_persona": {
-        "user_id": "judge_demo",
+        "user_id": "demo_user",
         "persona": (
             "I'm a 22-year-old UNILAG student living in Yaba on a tight ₦10k weekly budget. "
             "I love affordable street food and jollof spots, weekend Nollywood movies with friends, "
