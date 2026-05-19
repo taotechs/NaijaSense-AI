@@ -126,7 +126,7 @@ def test_task_b_recommendation() -> None:
         },
     }
     with patch(
-        "agents.task_b_pipeline.rerank_with_gemini",
+        "agents.task_b_pipeline.rerank_task_b",
         side_effect=mock_rerank_from_candidate_blob,
     ):
         response = client.post("/task-b/recommendation", json=payload)

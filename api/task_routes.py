@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import HTMLResponse
 
 from agents.task_a_two_pass import TaskATwoPassAgent
-from agents.task_b_gemini import TaskBRerankError
+from agents.task_b_errors import TaskBRerankError
 from agents.task_b_pipeline import TaskBPipelineAgent
 from api.deps import api_logger, orchestrator
 from api.task_page import task_endpoint_html

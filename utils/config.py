@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     groq_generator_model: Optional[str] = None
     orchestrator_model: str = "gpt-4o-mini"
 
-    # Task B stage-2 rerank (google-genai; GEMINI_API_KEY)
+    # Task B stage-2 rerank: groq (free tier, default) | gemini | auto
+    task_b_rerank_provider: str = "groq"
     gemini_api_key: Optional[str] = None
     task_b_gemini_model: str = "gemini-3-flash-preview"
 

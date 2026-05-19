@@ -7,6 +7,7 @@ import os
 from google import genai
 from google.genai import types
 
+from agents.task_b_errors import TaskBRerankError
 from utils.config import settings
 from utils.task_schemas import TaskBResponse
 
@@ -21,10 +22,6 @@ _SYSTEM_INSTRUCTION = (
     "and lifestyle. Select only items from the candidate list; do not invent venues. "
     "There is no separate search query — infer needs only from the User Profile Persona."
 )
-
-
-class TaskBRerankError(RuntimeError):
-    """Raised when Gemini reranking fails or returns an invalid payload."""
 
 
 def rerank_with_gemini(

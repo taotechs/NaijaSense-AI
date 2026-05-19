@@ -87,7 +87,7 @@ flowchart TB
 
 1. Parse `user_persona.persona` only (no separate query/context field).
 2. **Stage 1:** `retrieve_top_k` → up to 30 candidates (cold-start / cross-domain via `core/nigerian_defaults.py`).
-3. **Stage 2:** Gemini returns `agent_reasoning` plus a single `recommendations` paragraph (flowing prose, no numbered list).
+3. **Stage 2:** Groq (default, free tier) returns `agent_reasoning` plus one `recommendations` paragraph; optional Gemini when credits exist; local prose fallback if both fail.
 
 ### Unified hub (demo + benchmarks)
 

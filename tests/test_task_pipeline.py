@@ -43,6 +43,7 @@ def mock_rerank_from_candidate_blob(
     user_persona: str,
     candidate_items_list: str,
     top_k: int,
+    pool: object = None,
 ) -> TaskBResponse:
     """Build a paragraph-style TaskBResponse from stage-1 candidate lines."""
     titles: list[str] = []
@@ -72,7 +73,7 @@ def mock_rerank_from_candidate_blob(
 
 def test_task_b_pipeline_persona_only() -> None:
     with patch(
-        "agents.task_b_pipeline.rerank_with_gemini",
+        "agents.task_b_pipeline.rerank_task_b",
         side_effect=mock_rerank_from_candidate_blob,
     ):
         agent = TaskBPipelineAgent()
@@ -101,7 +102,7 @@ def test_task_b_pipeline_rejects_numbered_list() -> None:
             ),
         )
 
-    with patch("agents.task_b_pipeline.rerank_with_gemini", side_effect=_numbered_rerank):
+    with patch("agents.task_b_pipeline.rerank_task_b", side_effect=_numbered_rerank):
         agent = TaskBPipelineAgent()
         with pytest.raises(Exception) as exc_info:
             agent.run(

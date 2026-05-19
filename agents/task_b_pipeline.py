@@ -5,10 +5,13 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Tuple
 
-from agents.task_b_gemini import TaskBRerankError, rerank_with_gemini
+from agents.task_b_errors import TaskBRerankError
+from agents.task_b_rerank import rerank_task_b
 from core.candidate_catalog import CatalogItem, retrieve_top_k
 from core.persona_parser import ParsedPersona, parse_task_b_persona
 from utils.task_schemas import TaskBResponse
+
+_NUMBERED_LIST_RE = re.compile(r"(?m)^\s*\d+[\.\)]\s+")
 
 ARCHETYPE_BRIDGES = {
     "social": ("entertainment", "experiences", "food", "movies"),
@@ -21,11 +24,8 @@ ARCHETYPE_BRIDGES = {
     "drink": ("drinks", "food", "entertainment"),
 }
 
-_NUMBERED_LIST_RE = re.compile(r"(?m)^\s*\d+[\.\)]\s+")
-
-
 class TaskBPipelineAgent:
-    """Stage-1 corpus retrieval → Stage-2 Gemini Reason-Before-Recommend prose output."""
+    """Stage-1 corpus retrieval → Stage-2 LLM paragraph (Groq default, Gemini optional)."""
 
     DEFAULT_TOP_K = 10
 
@@ -55,7 +55,7 @@ class TaskBPipelineAgent:
             raise TaskBRerankError("Stage-1 retrieval returned no candidates.")
 
         want = min(k, len(stage1_pool))
-        recommendations_text, agent_reasoning = self._stage2_rerank_gemini(
+        recommendations_text, agent_reasoning = self._stage2_rerank(
             parsed=parsed,
             interests=interests,
             pool=stage1_pool,
@@ -87,7 +87,7 @@ class TaskBPipelineAgent:
             tone_notes=None,
         )
 
-    def _stage2_rerank_gemini(
+    def _stage2_rerank(
         self,
         *,
         parsed: ParsedPersona,
@@ -107,23 +107,23 @@ class TaskBPipelineAgent:
 
         user_persona = f"{monologue_seed}\n\nUSER PERSONA:\n{persona_block}"
 
-        result: TaskBResponse = rerank_with_gemini(
+        result: TaskBResponse = rerank_task_b(
             user_persona=user_persona,
             candidate_items_list=candidate_items_list,
             top_k=top_k,
+            pool=pool,
         )
 
         paragraph = (result.recommendations or "").strip()
         if len(paragraph) < 80:
-            raise TaskBRerankError("Gemini returned an empty or too-short recommendations paragraph.")
+            raise TaskBRerankError("Recommendations paragraph too short.")
         if _NUMBERED_LIST_RE.search(paragraph):
             raise TaskBRerankError(
-                "Gemini returned a numbered list; recommendations must be one fluid paragraph."
+                "Recommendations must be one fluid paragraph, not a numbered list."
             )
-
         reasoning = (result.agent_reasoning or "").strip()
         if not reasoning:
-            raise TaskBRerankError("Gemini returned empty agent_reasoning.")
+            raise TaskBRerankError("agent_reasoning is empty.")
 
         return paragraph, reasoning
 
