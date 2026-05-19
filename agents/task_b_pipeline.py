@@ -1,15 +1,14 @@
-"""Task B — 2-stage retrieval (top-30) + LLM agentic reranker (persona-only input)."""
+"""Task B — stage-1 retrieval (top-30) + Gemini structured rerank (persona-only)."""
 
 from __future__ import annotations
 
-import json
-import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
+from agents.task_b_gemini import TaskBRerankError, rerank_with_gemini
 from core.candidate_catalog import CatalogItem, retrieve_top_k
 from core.persona_parser import ParsedPersona, parse_task_b_persona
-from core.recommendation_items import display_domain, is_placeholder_item_name
-from models.llm_wrapper import LLMWrapper
+from core.recommendation_items import display_domain
+from utils.task_schemas import TaskBResponse
 
 ARCHETYPE_BRIDGES = {
     "social": ("entertainment", "experiences", "food", "movies"),
@@ -24,12 +23,9 @@ ARCHETYPE_BRIDGES = {
 
 
 class TaskBPipelineAgent:
-    """Stage-1 corpus retrieval → Stage-2 Reason-Before-Recommend LLM rerank."""
+    """Stage-1 corpus retrieval → Stage-2 Gemini Reason-Before-Recommend rerank."""
 
     DEFAULT_TOP_K = 10
-
-    def __init__(self, router_llm: Optional[LLMWrapper] = None) -> None:
-        self.llm = router_llm or LLMWrapper(role="router")
 
     def run(
         self,
@@ -46,15 +42,6 @@ class TaskBPipelineAgent:
         if cross_domain:
             interests = self._expand_cross_domain_interests(interests, parsed.narrative)
 
-        user_model: Dict[str, Any] = {
-            "user_id": user_id,
-            "location": parsed.location,
-            "bias": "balanced",
-            "persona_narrative": parsed.narrative,
-            "budget_sensitive": parsed.budget_sensitive,
-            "domains": parsed.domains,
-        }
-
         stage1_pool = self._stage1_retrieve(
             parsed=parsed,
             interests=interests,
@@ -62,12 +49,15 @@ class TaskBPipelineAgent:
             cross_domain=cross_domain,
         )
 
-        recommendations, agent_reasoning = self._stage2_rerank(
-            user_model=user_model,
+        if not stage1_pool:
+            raise TaskBRerankError("Stage-1 retrieval returned no candidates.")
+
+        want = min(k, len(stage1_pool))
+        recommendations, agent_reasoning = self._stage2_rerank_gemini(
             parsed=parsed,
             interests=interests,
             pool=stage1_pool,
-            top_k=k,
+            top_k=want,
             cold_start=parsed.cold_start,
             cross_domain=cross_domain,
         )
@@ -85,7 +75,6 @@ class TaskBPipelineAgent:
         cold_start: bool,
         cross_domain: bool,
     ) -> List[Tuple[CatalogItem, float]]:
-        """Top-30 candidates from corpus metadata (titles/domains unchanged)."""
         return retrieve_top_k(
             interests=interests,
             context=parsed.narrative,
@@ -96,10 +85,9 @@ class TaskBPipelineAgent:
             tone_notes=None,
         )
 
-    def _stage2_rerank(
+    def _stage2_rerank_gemini(
         self,
         *,
-        user_model: Dict[str, Any],
         parsed: ParsedPersona,
         interests: List[str],
         pool: List[Tuple[CatalogItem, float]],
@@ -107,79 +95,55 @@ class TaskBPipelineAgent:
         cold_start: bool,
         cross_domain: bool,
     ) -> Tuple[List[Dict[str, Any]], str]:
-        """LLM assigns confidence scores; titles/domains come from stage-1 corpus rows."""
         persona_block = parsed.narrative.strip()[:4000]
-
-        lines = [
-            f"- id={item.item_id} | domain={item.domain} | title={item.title} | stage1={score:.3f}"
-            for item, score in pool
-        ]
-        catalog_blob = "\n".join(lines)
-
         monologue_seed = self._build_persona_monologue(parsed, interests, cold_start, cross_domain)
 
-        system = (
-            "You are a Nigerian cross-category recommendation agent (Food, Movies, Drinks, Tech, etc.). "
-            "Read ONLY the user persona narrative — there is no separate search query. "
-            "Reason about lifestyle, financial limits, location, and cross-domain tastes, then rank candidates. "
-            "Use exact item_id values from the list; do not invent or rename titles. "
-            "Output ONLY valid JSON: "
-            '{"agent_reasoning": "...", "rankings": [{"item_id": "...", "confidence_score": 0.0-1.0}]} '
-            f"Return exactly {top_k} items, best-first. confidence_score must reflect persona fit."
-        )
-        user_msg = (
-            f"{monologue_seed}\n\n"
-            f"USER PERSONA (sole input):\n{persona_block}\n\n"
-            f"CANDIDATES — metadata from corpus (stage-1 top {len(pool)}):\n{catalog_blob}\n\n"
-            f"Rank top {top_k}. agent_reasoning must explain persona-driven weights "
-            "(budget, lifestyle, location) — do not mention a manual query string."
+        candidate_items_list = "\n".join(
+            f"- item_id={item.item_id} | domain={item.domain} | title={item.title} | stage1_score={score:.3f}"
+            for item, score in pool
         )
 
-        raw = self.llm.generate(user_msg, system=system, temperature=0.25).text.strip()
-        parsed_json = self._parse_json(raw)
-        id_to_item = {item.item_id: (item, s1) for item, s1 in pool}
-        title_to_item = {item.title.strip().lower(): (item, s1) for item, s1 in pool}
+        user_persona = f"{monologue_seed}\n\nUSER PERSONA:\n{persona_block}"
 
-        if parsed_json and parsed_json.get("rankings"):
-            agent_reasoning = str(parsed_json.get("agent_reasoning", "")).strip() or monologue_seed
-            recs: List[Dict[str, Any]] = []
-            for entry in parsed_json["rankings"][:top_k]:
-                iid = str(entry.get("item_id", "")).strip()
-                conf = float(entry.get("confidence_score", 0.5))
-                item_match = id_to_item.get(iid)
-                if item_match is None and iid:
-                    # LLM sometimes echoes internal ids — match by title if provided.
-                    title_key = str(entry.get("title", iid)).strip().lower()
-                    if not is_placeholder_item_name(title_key):
-                        item_match = title_to_item.get(title_key)
-                if item_match:
-                    item, _s1 = item_match
-                    recs.append(self._format_rec(item, conf))
-            if recs:
-                return recs, agent_reasoning
-
-        agent_reasoning = (
-            f"{monologue_seed} Stage-2 LLM rerank unavailable; confidence derived from "
-            "stage-1 persona match scores."
+        result: TaskBResponse = rerank_with_gemini(
+            user_persona=user_persona,
+            candidate_items_list=candidate_items_list,
+            top_k=top_k,
         )
-        max_s = max((s for _, s in pool), default=1.0) or 1.0
-        recs = []
-        for item, s1 in pool[:top_k]:
-            recs.append(self._format_rec(item, s1 / max_s))
-        return recs, agent_reasoning
 
-    @staticmethod
-    def _format_rec(item: CatalogItem, confidence: float) -> Dict[str, Any]:
-        """Ensure API cards use catalog titles/categories, not raw corpus markers."""
-        title = (item.title or "").strip()
-        if is_placeholder_item_name(title):
-            title = "Recommended local pick"
-        return {
-            "item_id": item.item_id,
-            "title": title,
-            "domain": display_domain(item.domain),
-            "confidence_score": round(min(1.0, max(0.0, float(confidence))), 4),
-        }
+        allowed_ids = {item.item_id for item, _ in pool}
+        catalog_by_id = {item.item_id: item for item, _ in pool}
+
+        recs: List[Dict[str, Any]] = []
+        for entry in result.recommendations:
+            if entry.item_id not in allowed_ids:
+                raise TaskBRerankError(
+                    f"Gemini returned item_id not in stage-1 pool: {entry.item_id!r}"
+                )
+            catalog_item = catalog_by_id[entry.item_id]
+            title = (entry.title or "").strip() or catalog_item.title
+            domain = (entry.domain or "").strip() or display_domain(catalog_item.domain)
+            recs.append(
+                {
+                    "item_id": entry.item_id,
+                    "title": title,
+                    "domain": domain,
+                    "confidence_score": round(min(1.0, max(0.0, float(entry.confidence_score))), 4),
+                }
+            )
+            if len(recs) >= top_k:
+                break
+
+        if len(recs) < top_k:
+            raise TaskBRerankError(
+                f"Gemini returned {len(recs)} valid recommendations; expected {top_k}."
+            )
+
+        reasoning = (result.agent_reasoning or "").strip()
+        if not reasoning:
+            raise TaskBRerankError("Gemini returned empty agent_reasoning.")
+
+        return recs, reasoning
 
     @staticmethod
     def _build_persona_monologue(
@@ -218,16 +182,3 @@ class TaskBPipelineAgent:
             if archetype in blob:
                 expanded.extend(domains)
         return list(dict.fromkeys(expanded))
-
-    @staticmethod
-    def _parse_json(raw: str) -> Optional[Dict[str, Any]]:
-        raw = raw.strip()
-        try:
-            if raw.startswith("{"):
-                return json.loads(raw)
-            match = re.search(r"\{[\s\S]*\}", raw)
-            if match:
-                return json.loads(match.group(0))
-        except json.JSONDecodeError:
-            return None
-        return None
