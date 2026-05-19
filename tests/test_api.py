@@ -132,11 +132,8 @@ def test_task_b_recommendation() -> None:
         response = client.post("/task-b/recommendation", json=payload)
     body = response.json()
     assert response.status_code == 200
-    assert len(body["recommendations"]) >= 1
-    assert body["recommendations"][0]["item_id"]
-    assert body["recommendations"][0]["title"]
-    assert body["recommendations"][0]["domain"]
-    assert "confidence_score" in body["recommendations"][0]
+    assert isinstance(body["recommendations"], str)
+    assert len(body["recommendations"]) >= 80
     assert len(body["agent_reasoning"]) > 20
 
 
