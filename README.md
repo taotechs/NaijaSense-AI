@@ -8,8 +8,8 @@ Use these **two separate URLs** in the DSN × BCT submission form:
 
 | Task | Method | Endpoint | Input | Output |
 |------|--------|----------|-------|--------|
-| **Task A — User modeling** | `POST` | `/task-a/user-modeling` | `user_persona` + `product_details` | `rating` (1–5) + `review` |
-| **Task B — Recommendation** | `POST` | `/task-b/recommendation` | `user_persona` (+ optional `context`) | `recommendations[]` + `chain_of_thought` |
+| **Task A — User modeling** | `POST` | `/task-a/user-modeling` | `user_persona` + `product_details` (strings) | `rating`, `review_reasoning`, `review_text` |
+| **Task B — Recommendation** | `POST` | `/task-b/recommendation` | `user_persona`: `{ user_id, persona }` only | `recommendations[]` + `agent_reasoning` |
 
 **Live submission URLs** (Vercel proxies POST to Koyeb — redeploy both tiers after pulling latest `main`).
 
@@ -29,12 +29,13 @@ Use these **two separate URLs** in the DSN × BCT submission form:
 
 ---
 
-NaijaSense AI is a context-aware, multi-agent system designed around two core workloads behind one unified API and a single chat UI branded as the **Behavioral Intelligence Hub**:
+NaijaSense AI ships **two submission POST endpoints** (Task A & Task B) plus a **Behavioral Intelligence Hub** (`/unified`) for demos, streaming traces, and ablations.
 
-- **Task A — User Modeling:** simulate a star rating and a written review for an unseen item, conditioned on a user persona inferred from minimal signals.
-- **Task B — Recommendation:** rank items for an individual user, handling cold-start, cross-domain, and multi-turn conversational queries with explicit reasoning traces.
+- **Task A (submission):** two-pass user modeling — Pass 1 locks a domain-aware star rating + rationale; Pass 2 writes first-person `review_text` aligned to that score (`TaskATwoPassAgent`).
+- **Task B (submission):** persona-only input — stage-1 corpus retrieval (top 30) then LLM **Reason-Before-Recommend** rerank with mandatory `agent_reasoning` (`TaskBPipelineAgent`).
+- **Unified hub (demo):** intent router → orchestrator with silent history by `user_id`, critique→regenerate on reviews, and legacy deterministic ranking on `/api/v1/recommend` (benchmark path).
 
-The system intentionally **separates a small fast router model from a strong generator model**, grounds review writing in retrieved corpus examples (RAG), and runs an optional **critique → regenerate** loop to catch generic outputs before they reach the user. Every request also runs a **silent context-retrieval step** that pulls the user's historical ratings/reviews from the normalized corpus by `user_id` *before* any LLM call, so the persona used for generation and ranking reflects real past behaviour rather than a static UI profile.
+The stack **separates a fast router model from a strong generator** (Groq Llama 3.1 8B + Llama 3.3 70B), grounds Task A in corpus few-shots/RAG, and documents both paths honestly in [`docs/SOLUTION_PAPER.md`](docs/SOLUTION_PAPER.md).
 
 <p align="center">
   <img src="docs/homescreen.png" width="380" alt="Behavioral Intelligence Hub — landing screen with quick-start chips and backend status" />
@@ -60,61 +61,63 @@ The system intentionally **separates a small fast router model from a strong gen
 
 ## Architecture
 
+### Submission endpoints (Task A & Task B)
+
+```mermaid
+flowchart TB
+    C[Client] --> TA[POST /task-a/user-modeling]
+    C --> TB[POST /task-b/recommendation]
+    TA --> P1[parse_task_a_inputs<br/>domain from product text]
+    P1 --> A1[TaskATwoPassAgent]
+    A1 --> R1[rating + review_reasoning + review_text]
+    TB --> P2[parse_task_b_persona]
+    P2 --> B1[TaskBPipelineAgent]
+    B1 --> S1[Stage 1: top-30 catalog retrieval]
+    S1 --> S2[Stage 2: LLM Reason-Before-Recommend rerank]
+    S2 --> R2[recommendations + agent_reasoning]
+```
+
+**Task A flow (`TaskATwoPassAgent`):**
+
+1. Parse `user_persona` + `product_details` strings; infer **product domain** from product text (`core/task_a_inputs.py`).
+2. **Pass 1 (router):** JSON `{ rating, review_reasoning }` with domain few-shots + optional corpus search (top 3).
+3. **Pass 2 (generator):** first-person `review_text` with **rating locked** from Pass 1.
+
+**Task B flow (`TaskBPipelineAgent`):**
+
+1. Parse `user_persona.persona` only (no separate query/context field).
+2. **Stage 1:** `retrieve_top_k` → up to 30 candidates (cold-start / cross-domain via `core/nigerian_defaults.py`).
+3. **Stage 2:** router LLM returns `agent_reasoning` + ranked `item_id` / `confidence_score` list; stage-1 scores used as fallback if JSON parse fails.
+
+### Unified hub (demo + benchmarks)
+
 ```mermaid
 flowchart LR
     U[User] --> FE[Behavioral Intelligence Hub<br/>Next.js /unified]
     U --> SW[Swagger /docs]
     FE -->|POST| AGW[Agent Gateway v1<br/>multi-turn buffer]
-    FE -->|POST NDJSON| STR[Streaming Gateway<br/>live reasoning steps]
-    FE -->|POST thumbs| FB[Feedback Endpoint<br/>JSONL log]
-    FE -->|GET| HC[Health Check<br/>status pill + pre-warm]
+    FE -->|POST NDJSON| STR[Streaming Gateway]
+    FE -->|POST thumbs| FB[Feedback JSONL]
     SW --> AGW
-    AGW --> SAFE[Safety Layer<br/>prompt-injection / PII / ungrounded specifics]
+    AGW --> SAFE[Safety Layer]
     STR --> SAFE
-    SAFE --> IR[Intent Router LLM small/heuristic]
-    IR -->|task=review| O[Orchestrator]
-    IR -->|task=recommend| O
-    O -.optional skip.-> SCR[Silent Context Retrieval<br/>by user_id]
-    SCR --> HUS[(Historical User Store<br/>corpus indexed by user_id)]
-    SCR --> O
-    O --> UMA[User Modeling Agent — router LLM<br/>history baseline + UI override]
-    O --> RGA[Review Generation Agent — generator LLM<br/>english / pidgin / yoruba_mix]
-    O --> RA[Recommendation Agent — deterministic hybrid scorer<br/>+ chain-of-thought trace]
-    RGA --> RAG[(Review Corpus Store / RAG)]
-    RGA --> CRI[Critic LLM — router model]
-    O --> MEM[(User Memory / Vector Store<br/>warmed from history)]
-    O --> TRC[Reasoning Trace + safety_flags + timing_ms]
+    SAFE --> IR[Intent Router]
+    IR --> O[Orchestrator]
+    O -.optional.-> SCR[Silent History by user_id]
+    SCR --> HUS[(Historical User Store)]
+    O --> UMA[User Modeling Agent]
+    O --> RGA[Review Generation + Critic]
+    O --> RA[Recommendation Agent<br/>deterministic hybrid scorer]
+    RGA --> RAG[(Corpus / RAG)]
 ```
 
-### Stateful agentic workflow (silent context retrieval)
+**Unified hub only** — not used on `/task-a` or `/task-b`:
 
-Both task flows start with the same shared step:
+0. **Silent context retrieval** by `user_id` before routing (`HistoricalUserStore` → `UserMemory` + `HistoricalPersona`).
+1. **Task A (orchestrator):** persona merge → RAG → generate → optional critique→regenerate → persist to memory.
+2. **Task B (orchestrator):** multi-turn buffer → deterministic hybrid scorer (`0.5×interest + 0.25×memory + …`) → `chain_of_thought` in `explainability` (legacy `/api/v1/recommend` and ablation harness).
 
-0. **Silent context retrieval.** `HistoricalUserStore` (built at startup from `data/processed/review_corpus.jsonl`) is queried by `user_id`. Up to 5 past entries are pulled, normalised to short snippets, and pushed into `UserMemory` so downstream vector retrieval also sees historical behaviour. A `HistoricalPersona` summary (`avg_rating`, `rating_tendency`, `sentiment_bias`, `tone_signal`, `top_domains`, `inferred_interests`) is derived from the same rows. This whole step runs *before any LLM call* and never blocks the request — unknown `user_id`s fall through with an empty persona.
-
-The `UserModelingAgent` then merges this baseline with the UI-supplied persona under explicit **default-vs-override semantics**: history wins by default, UI fields override only when the user actively set them (non-empty for free-text, non-default for enums). The merge result is logged in `merge_meta.overridden_fields` and `merge_meta.source_per_field` and surfaced in the reasoning trace and on the response. Multi-turn for Task B is implemented as a per-`user_id` rolling 6-turn buffer in `api/deps.py`; the most recent prior turns are threaded into `RecommendationRequest.conversation_history` automatically.
-
-### Task A — Review Simulation flow
-
-1. **Silent context retrieval** for `user_id`.
-2. `UserModelingAgent` merges historical baseline + UI overrides.
-3. `ReviewCorpusStore.search()` retrieves top-3 similar items for style grounding.
-4. `ReviewGenerationAgent` builds a structured *fact* prompt (no draft text), adds a few-shot block, a variation token, and a per-call random seed; calls the strong generator with explicit `top_p`, `presence_penalty`, `frequency_penalty`, `seed`.
-5. If `REVIEW_CRITIQUE_ENABLED=true`, the router model scores the review on specificity (1–5). Below threshold → one rewrite with the critic's issues injected as rules.
-6. Generated review is stored back into `UserMemory` for downstream tasks. Response includes `persona_breakdown.historical_signal`, `persona_breakdown.history_used`, and `persona_breakdown.merge_meta`.
-
-### Task B — Recommendation flow
-
-1. **Silent context retrieval** for `user_id`.
-2. Gateway threads the **rolling multi-turn buffer** (prior turns from this same user_id) into `conversation_history`.
-3. Chain-of-thought reasoning step: the orchestrator logs *why* this retrieval strategy was chosen (history present?, multi-turn turns count, free-text context).
-4. `UserMemory` (now warmed with both in-session and silent-historical snippets) returns relevant prior interactions.
-5. `RecommendationAgent` scores each candidate with a hybrid signal:
-   - `0.5 × interest_overlap + 0.25 × memory_overlap + 0.2 × context_overlap + 0.2 × domain_alignment + base + bias`
-   - Conditional boosts: spicy / budget / relax / cold-start / cross-domain.
-   - Template-y items ("starter pack", "bundle") penalised when there's no contextual hook.
-6. The agent emits an explicit `chain_of_thought` array in `explainability` naming the path taken (warm vs cold start, cross-domain flag, multi-turn-aware flag, active intent boosts, top pick rationale).
-7. Returns ranked recommendations + conversational summary + explainability dict with `historical_signal` + `history_turns_used`.
+See [`docs/SOLUTION_PAPER.md`](docs/SOLUTION_PAPER.md) for the full submission vs demo split.
 
 ---
 
@@ -240,8 +243,8 @@ If both commands pass, the stack is functional end-to-end.
 | Method | Path | What it does |
 |---|---|---|
 | `GET` | `/` | **Submission landing page** — HTML with links to Task A and Task B. |
-| `POST` | `/task-a/user-modeling` | **Task A (hackathon).** Body: `user_persona`, `product_details`. |
-| `POST` | `/task-b/recommendation` | **Task B (hackathon).** Body: `user_persona`, optional `context`, `top_k`. |
+| `POST` | `/task-a/user-modeling` | **Task A (hackathon).** Body: `user_persona` (string), `product_details` (string). |
+| `POST` | `/task-b/recommendation` | **Task B (hackathon).** Body: `user_persona`: `{ user_id, persona }` only. |
 | `GET` | `/api/v1/health` | Liveness probe; doubles as a cold-start pre-warm for the frontend. |
 | `POST` | `/api/v1/simulate-review` | Task A — legacy explicit endpoint. Body: `user_profile`, `item_data`, `persona_style`. |
 | `POST` | `/api/v1/recommend` | Task B — legacy explicit endpoint. Body: `user_profile`, `candidate_items`, `context`, `top_k`. |
@@ -273,17 +276,8 @@ If both commands pass, the stack is functional end-to-end.
 curl -X POST "http://localhost:8000/task-a/user-modeling" \
   -H "Content-Type: application/json" \
   -d '{
-    "user_persona": {
-      "user_id": "judge_1",
-      "location": "Lagos",
-      "interests": ["street food"],
-      "sentiment_bias": "balanced",
-      "tone_notes": "Value for money; honest Nigerian tone."
-    },
-    "product_details": {
-      "item_name": "Iya Eba Amala Spot",
-      "item_context": "Saturday lunch, amala soft, egusi rich, about 2k each."
-    }
+    "user_persona": "Lagos-based foodie in Yaba, balanced reviewer. Cares about value-for-money, wait times, and authentic local taste.",
+    "product_details": "Iya Eba Amala Spot — Saturday lunch with a friend. Amala was soft, egusi rich without too much oil, about 2k each, waited roughly 20 minutes."
   }'
 ```
 
@@ -294,12 +288,9 @@ curl -X POST "http://localhost:8000/task-b/recommendation" \
   -H "Content-Type: application/json" \
   -d '{
     "user_persona": {
-      "user_id": "judge_2",
-      "location": "Yaba, Lagos",
-      "interests": ["food"]
-    },
-    "context": "Cheap weekend eats, not too far.",
-    "top_k": 5
+      "user_id": "demo_user_2",
+      "persona": "22-year-old UNILAG student in Yaba on a tight 10k weekly budget. Loves affordable street food, jollof spots, and weekend Nollywood with friends — value-for-money over luxury."
+    }
   }'
 ```
 
@@ -407,7 +398,7 @@ See `data/benchmark_results.json` for the full table. Highlights:
 - **LLM is the dominant factor for Task A**: removing it drops ROUGE-1 by ~22% (0.161 → 0.126).
 - **RAG slightly hurts ROUGE but helps diversity** (a classic lexical-metric blind spot): retrieved few-shots push the model toward more concrete, item-specific phrasings that don't necessarily share n-grams with gold.
 - **Critique loop is metric-neutral on lexical scores** — by design, it targets human quality, not n-gram overlap.
-- **Task B is identical across variants** because the ranker is fully deterministic; the LLM contributes only the conversational summary. The current Hit Rate@10 of 0.2 (vs 0.5 random baseline on a same-domain candidate set) flags a clear limitation: the hybrid scorer's interest-overlap signal is too narrow when distractors share the target's domain. Future work: add an LLM-driven reranking layer.
+- **Task B ablations** use the orchestrator's **deterministic** ranker (identical metrics across variants; Hit Rate@10 ≈ 0.2 vs ~0.5 random on hard same-domain distractors). The **submission** endpoint (`/task-b/recommendation`) adds LLM reranking over stage-1 candidates — use that path for evaluation, not the ablation harness alone.
 
 ### Behavioural fidelity (A/B history harness)
 
@@ -456,7 +447,7 @@ pytest -q
 
 ```text
 .
-├── agents/                  # User modeling, review generation (with critique loop), recommendation
+├── agents/                  # task_a_two_pass, task_b_pipeline, orchestrator agents, critique loop
 ├── api/                     # FastAPI app + unified agent gateway route
 ├── core/                    # Orchestrator + LangChain intent router
 ├── data/                    # Processed corpus + benchmark results
@@ -489,7 +480,7 @@ pytest -q
 - ✅ Multi-language output: English · Nigerian Pidgin · English + Yoruba mix
 - ✅ Advisory safety / validation layer with `safety_flags` on every response
 - ✅ User feedback loop (thumbs up/down → JSONL log + stats endpoint)
-- ✅ Solution paper at [`docs/SOLUTION_PAPER.md`](docs/SOLUTION_PAPER.md)
+- ✅ Solution paper at [`docs/SOLUTION_PAPER.md`](docs/SOLUTION_PAPER.md) (submission PDF: `docs/TEAM TAOTECH SOLUTIONS SOLUTION_PAPER.pdf`)
 - ✅ Reproducible Docker Compose stack
 - ✅ Public production deploy: Vercel (frontend) + Koyeb (backend)
 - ✅ Nigerian contextualisation in tone + retrieval seed data
