@@ -1,8 +1,11 @@
 """Basic API integration tests."""
 
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
 from api.app import app
+from tests.test_task_pipeline import mock_rerank_from_candidate_blob
 
 client = TestClient(app)
 
@@ -122,7 +125,11 @@ def test_task_b_recommendation() -> None:
             ),
         },
     }
-    response = client.post("/task-b/recommendation", json=payload)
+    with patch(
+        "agents.task_b_pipeline.rerank_with_gemini",
+        side_effect=mock_rerank_from_candidate_blob,
+    ):
+        response = client.post("/task-b/recommendation", json=payload)
     body = response.json()
     assert response.status_code == 200
     assert len(body["recommendations"]) >= 1
