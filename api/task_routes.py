@@ -14,7 +14,6 @@ from core.nigerian_defaults import apply_cold_start_interests
 from core.task_a_inputs import parse_task_a_inputs
 from utils.schemas import UserProfile
 from utils.task_schemas import (
-    RecommendationItem,
     TaskARequest,
     TaskAResponse,
     TaskBRequest,
@@ -98,7 +97,7 @@ def task_b_recommendation_get() -> HTMLResponse:
         task_endpoint_html(
             task_name="Task B — Recommendation",
             path="/task-b/recommendation",
-            description="Input: user_persona only. Output: recommendations[] + agent_reasoning.",
+            description="Input: user_persona only. Output: recommendations (paragraph) + agent_reasoning.",
             example_body=_TASK_B_EXAMPLE,
         )
     )
@@ -171,17 +170,7 @@ def task_b_recommendation(payload: TaskBRequest) -> TaskBResponse:
             detail="Task B failed.",
         ) from exc
 
-    recs = [
-        RecommendationItem(
-            item_id=item["item_id"],
-            title=item["title"],
-            domain=item["domain"],
-            confidence_score=item["confidence_score"],
-        )
-        for item in result["recommendations"]
-    ]
-
     return TaskBResponse(
-        recommendations=recs,
+        recommendations=result["recommendations"],
         agent_reasoning=result["agent_reasoning"],
     )
