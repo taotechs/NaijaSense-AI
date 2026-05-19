@@ -20,7 +20,7 @@ corpus_store = ReviewCorpusStore(corpus_path=settings.review_corpus_path)
 historical_store = HistoricalUserStore(corpus_path=settings.review_corpus_path)
 
 # Seed the per-user vector memory from the historical corpus so the first
-# request a judge fires against any *known* user_id (e.g. the curated
+# request against any *known* user_id (e.g. the curated
 # off_y_*, hf_yelp_*, off_g_*, off_amz_* records) already has past behaviour
 # indexed for retrieval. Unknown user_ids accrue history only as they
 # interact, which is the original behaviour.
