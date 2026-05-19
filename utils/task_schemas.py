@@ -92,6 +92,8 @@ class TaskBRequest(BaseModel):
 
 
 class RecommendationItem(BaseModel):
+    """Legacy structured item (unified /api routes). Hackathon Task B uses prose only."""
+
     item_id: str
     title: str
     domain: str
@@ -99,7 +101,14 @@ class RecommendationItem(BaseModel):
 
 
 class TaskBResponse(BaseModel):
-    recommendations: List[RecommendationItem]
+    recommendations: str = Field(
+        ...,
+        min_length=80,
+        description=(
+            "Single flowing paragraph of natural recommendation sentences tailored to the "
+            "persona (not a numbered or bulleted list)."
+        ),
+    )
     agent_reasoning: str = Field(
         ...,
         description="Mandatory Reason-Before-Recommend internal monologue (explainability).",
