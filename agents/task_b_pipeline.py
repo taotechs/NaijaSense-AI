@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Tuple
 
 from agents.task_b_gemini import TaskBRerankError, rerank_with_gemini
 from core.candidate_catalog import CatalogItem, retrieve_top_k
 from core.persona_parser import ParsedPersona, parse_task_b_persona
-from core.recommendation_items import display_domain
 from utils.task_schemas import TaskBResponse
 
 ARCHETYPE_BRIDGES = {
@@ -21,9 +21,11 @@ ARCHETYPE_BRIDGES = {
     "drink": ("drinks", "food", "entertainment"),
 }
 
+_NUMBERED_LIST_RE = re.compile(r"(?m)^\s*\d+[\.\)]\s+")
+
 
 class TaskBPipelineAgent:
-    """Stage-1 corpus retrieval → Stage-2 Gemini Reason-Before-Recommend rerank."""
+    """Stage-1 corpus retrieval → Stage-2 Gemini Reason-Before-Recommend prose output."""
 
     DEFAULT_TOP_K = 10
 
@@ -53,7 +55,7 @@ class TaskBPipelineAgent:
             raise TaskBRerankError("Stage-1 retrieval returned no candidates.")
 
         want = min(k, len(stage1_pool))
-        recommendations, agent_reasoning = self._stage2_rerank_gemini(
+        recommendations_text, agent_reasoning = self._stage2_rerank_gemini(
             parsed=parsed,
             interests=interests,
             pool=stage1_pool,
@@ -63,7 +65,7 @@ class TaskBPipelineAgent:
         )
 
         return {
-            "recommendations": recommendations,
+            "recommendations": recommendations_text,
             "agent_reasoning": agent_reasoning,
         }
 
@@ -94,7 +96,7 @@ class TaskBPipelineAgent:
         top_k: int,
         cold_start: bool,
         cross_domain: bool,
-    ) -> Tuple[List[Dict[str, Any]], str]:
+    ) -> Tuple[str, str]:
         persona_block = parsed.narrative.strip()[:4000]
         monologue_seed = self._build_persona_monologue(parsed, interests, cold_start, cross_domain)
 
@@ -111,39 +113,19 @@ class TaskBPipelineAgent:
             top_k=top_k,
         )
 
-        allowed_ids = {item.item_id for item, _ in pool}
-        catalog_by_id = {item.item_id: item for item, _ in pool}
-
-        recs: List[Dict[str, Any]] = []
-        for entry in result.recommendations:
-            if entry.item_id not in allowed_ids:
-                raise TaskBRerankError(
-                    f"Gemini returned item_id not in stage-1 pool: {entry.item_id!r}"
-                )
-            catalog_item = catalog_by_id[entry.item_id]
-            title = (entry.title or "").strip() or catalog_item.title
-            domain = (entry.domain or "").strip() or display_domain(catalog_item.domain)
-            recs.append(
-                {
-                    "item_id": entry.item_id,
-                    "title": title,
-                    "domain": domain,
-                    "confidence_score": round(min(1.0, max(0.0, float(entry.confidence_score))), 4),
-                }
-            )
-            if len(recs) >= top_k:
-                break
-
-        if len(recs) < top_k:
+        paragraph = (result.recommendations or "").strip()
+        if len(paragraph) < 80:
+            raise TaskBRerankError("Gemini returned an empty or too-short recommendations paragraph.")
+        if _NUMBERED_LIST_RE.search(paragraph):
             raise TaskBRerankError(
-                f"Gemini returned {len(recs)} valid recommendations; expected {top_k}."
+                "Gemini returned a numbered list; recommendations must be one fluid paragraph."
             )
 
         reasoning = (result.agent_reasoning or "").strip()
         if not reasoning:
             raise TaskBRerankError("Gemini returned empty agent_reasoning.")
 
-        return recs, reasoning
+        return paragraph, reasoning
 
     @staticmethod
     def _build_persona_monologue(
