@@ -80,7 +80,8 @@ def _smoke_hackathon_tasks(base_url: str) -> None:
         )
         tb.raise_for_status()
     print("Hackathon Task A rating:", ta.json().get("rating"))
-    print("Hackathon Task B top pick:", tb.json()["recommendations"][0]["title"])
+    rec_text = tb.json().get("recommendations", "")
+    print("Hackathon Task B recommendations:", (rec_text[:200] + "…") if len(rec_text) > 200 else rec_text)
     print()
 
 
