@@ -15,7 +15,7 @@ export default function HomePage() {
           Two tasks — each with its own demo screen
         </h2>
         <p className="mt-2 text-sm text-slate-400">
-          Submit the API URLs in the hackathon form. Use the demo buttons below to
+          Use the API URLs as your agent links. Open the demo screens below to
           test Task A and Task B in the browser (no Swagger required).
         </p>
       </section>
