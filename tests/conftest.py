@@ -1,4 +1,4 @@
-"""Pytest hooks — keep integration tests fast (no 10k corpus build on import)."""
+"""Pytest hooks - keep integration tests fast (no 10k corpus build on import)."""
 
 from __future__ import annotations
 

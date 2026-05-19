@@ -12,7 +12,7 @@ export default function HomePage() {
           Dual-link submission
         </p>
         <h2 className="mt-2 text-xl font-semibold text-slate-100">
-          Two tasks — each with its own demo screen
+          Two tasks - each with its own demo screen
         </h2>
         <p className="mt-2 text-sm text-slate-400">
           Use the API URLs as your agent links. Open the demo screens below to
@@ -22,7 +22,7 @@ export default function HomePage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <article className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-          <h3 className="font-semibold text-slate-100">Task A — User modeling</h3>
+          <h3 className="font-semibold text-slate-100">Task A - User modeling</h3>
           <p className="mt-2 text-xs text-slate-400">
             Persona + product → rating + review.
           </p>
@@ -38,7 +38,7 @@ export default function HomePage() {
         </article>
 
         <article className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-          <h3 className="font-semibold text-slate-100">Task B — Recommendation</h3>
+          <h3 className="font-semibold text-slate-100">Task B - Recommendation</h3>
           <p className="mt-2 text-xs text-slate-400">
             Persona → ranked list + chain-of-thought.
           </p>

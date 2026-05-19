@@ -12,12 +12,12 @@ COLD_START_INTERESTS: List[str] = [
     "mobile gadgets",
 ]
 
-# Curated cross-domain pool — food, tech, entertainment, wellness.
+# Curated cross-domain pool - food, tech, entertainment, wellness.
 NIGERIAN_CANDIDATE_CATALOG: List[str] = [
-    "Iya Eba Amala Spot — Yaba",
-    "Suya & Chill Stand — Ikeja",
-    "Shawarma Alley — VI",
-    "Local Jollof Kitchen — Surulere",
+    "Iya Eba Amala Spot - Yaba",
+    "Suya & Chill Stand - Ikeja",
+    "Shawarma Alley - VI",
+    "Local Jollof Kitchen - Surulere",
     "Budget USB-C Power Bank",
     "Wireless Earbuds (wallet-friendly)",
     "Nollywood weekend drama pick",

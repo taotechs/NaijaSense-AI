@@ -109,7 +109,7 @@ export async function postAgentGateway(
   return (await response.json()) as AgentGatewayResponse;
 }
 
-// 4. Streaming variant — parses newline-delimited JSON from /api/agent/v1/stream.
+// 4. Streaming variant - parses newline-delimited JSON from /api/agent/v1/stream.
 // Each event is delivered to ``onEvent`` as it arrives, including the
 // final ``{ type: 'final', result }``. The promise resolves with the
 // final response once the stream closes.
@@ -142,7 +142,7 @@ export async function streamAgentGateway(
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    // Process line-by-line — server flushes one JSON object per newline.
+    // Process line-by-line - server flushes one JSON object per newline.
     let idx: number;
     while ((idx = buffer.indexOf("\n")) >= 0) {
       const line = buffer.slice(0, idx).trim();
@@ -175,7 +175,7 @@ export async function streamAgentGateway(
   return finalResult;
 }
 
-// 5. Health check — used by the BackendStatus pill + page-load pre-warm.
+// 5. Health check - used by the BackendStatus pill + page-load pre-warm.
 export type BackendHealth = { status: string; service?: string };
 
 export async function getBackendHealth(): Promise<BackendHealth> {
@@ -188,7 +188,7 @@ export async function getBackendHealth(): Promise<BackendHealth> {
   return (await res.json()) as BackendHealth;
 }
 
-// 6. Feedback (thumbs up/down). Fire-and-forget from the UI is fine —
+// 6. Feedback (thumbs up/down). Fire-and-forget from the UI is fine  - 
 // failures should not break the page, so callers usually ignore errors.
 export type FeedbackInput = {
   user_id: string;

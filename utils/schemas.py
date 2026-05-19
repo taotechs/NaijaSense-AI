@@ -127,7 +127,7 @@ class AgentGatewayRequest(BaseModel):
     compare_with_no_history: bool = Field(
         default=False,
         description=(
-            "When True, runs the agent twice — once with history, once without — "
+            "When True, runs the agent twice - once with history, once without - "
             "and returns both for side-by-side comparison."
         ),
     )

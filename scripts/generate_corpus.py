@@ -32,27 +32,27 @@ DEFAULT_OUTPUT = PROJECT_ROOT / "data" / "large_corpus.json"
 # --- Yelp seeds (Nigerian lifestyle) ------------------------------------------
 
 _YELP_FOOD_NAMES = [
-    "Iya Eba Amala Spot — Yaba",
-    "Mama Put Garri & Soup — Mushin",
-    "Late-night Suya & Chill — Ikeja",
-    "Local Jollof Kitchen — Surulere",
-    "Shawarma Alley — Victoria Island",
-    "Pepper Soup & Catfish Grill — Lekki",
-    "Campus Canteen Jollof — UNILAG",
-    "Akara & Pap Corner — Yaba",
-    "Buka Hop — Lagos mainland",
-    "Grilled Plantain & Fish — PH GRA",
+    "Iya Eba Amala Spot - Yaba",
+    "Mama Put Garri & Soup - Mushin",
+    "Late-night Suya & Chill - Ikeja",
+    "Local Jollof Kitchen - Surulere",
+    "Shawarma Alley - Victoria Island",
+    "Pepper Soup & Catfish Grill - Lekki",
+    "Campus Canteen Jollof - UNILAG",
+    "Akara & Pap Corner - Yaba",
+    "Buka Hop - Lagos mainland",
+    "Grilled Plantain & Fish - PH GRA",
 ]
 
 _YELP_DRINK_NAMES = [
-    "Smoothie Bar — Wuse, Abuja",
-    "Chapman & Mocktail Lounge — VI",
-    "Palm Wine Terrace — Lekki",
-    "Kunu & Zobo Stand — Kaduna Road",
-    "Specialty Coffee Hut — Ikeja",
-    "Fresh Juice Cart — Yaba market",
-    "Afrobeats Rooftop Bar — Lagos Island",
-    "Tea & Pastry Corner — Surulere",
+    "Smoothie Bar - Wuse, Abuja",
+    "Chapman & Mocktail Lounge - VI",
+    "Palm Wine Terrace - Lekki",
+    "Kunu & Zobo Stand - Kaduna Road",
+    "Specialty Coffee Hut - Ikeja",
+    "Fresh Juice Cart - Yaba market",
+    "Afrobeats Rooftop Bar - Lagos Island",
+    "Tea & Pastry Corner - Surulere",
 ]
 
 _YELP_LOCATIONS = [
@@ -82,9 +82,9 @@ _YELP_SENTIMENT_TAGS = [
 ]
 
 _YELP_REVIEW_TEMPLATES = [
-    "Paid about ₦{price} — {sentiment} The {category_lower} vibe at {location} fits a {tag} crowd.",
+    "Paid about ₦{price} - {sentiment} The {category_lower} vibe at {location} fits a {tag} crowd.",
     "{business} in {location}: jollof/smoke level was {quality}. Tags I'd use: {tags}.",
-    "Honest buka run — {sentiment} Portion and wait time felt right for {price_tier} tier around {location}.",
+    "Honest buka run - {sentiment} Portion and wait time felt right for {price_tier} tier around {location}.",
     "Weekend outing spot; {sentiment} Would bring friends who care about {tag} and local flavour.",
 ]
 
@@ -94,30 +94,30 @@ _AMAZON_TECH = [
     ("Wireless Earbuds Pro", 89.99, 4.2),
     ("USB-C Power Bank 20Ah", 45.00, 4.5),
     ("Mechanical Keyboard 60%", 120.00, 4.3),
-    ("4G MiFi Router — data saver", 65.00, 4.0),
+    ("4G MiFi Router - data saver", 65.00, 4.0),
     ("Compact Bluetooth Keyboard", 55.00, 4.1),
     ("Noise-cancelling Headphones", 149.00, 4.4),
     ("Laptop USB-C Hub 7-in-1", 38.00, 4.2),
-    ("Fitness Band — sleep tracking", 42.00, 3.9),
+    ("Fitness Band - sleep tracking", 42.00, 3.9),
     ("Portable SSD 1TB", 95.00, 4.6),
     ("Ring light for video calls", 28.00, 4.0),
 ]
 
 _AMAZON_UTILITIES = [
-    ("LED Desk Lamp — adjustable", 32.00, 4.3),
+    ("LED Desk Lamp - adjustable", 32.00, 4.3),
     ("Surge Protector 6-outlet", 24.00, 4.5),
     ("Reusable Water Bottle 1L", 18.00, 4.4),
-    ("Electric Kettle — fast boil", 40.00, 4.2),
+    ("Electric Kettle - fast boil", 40.00, 4.2),
     ("Extension Cord 5m", 15.00, 4.1),
     ("Storage Organiser Set", 22.00, 4.0),
     ("Travel Adapter Universal", 19.00, 4.3),
-    ("Desk Fan — quiet mode", 35.00, 3.8),
+    ("Desk Fan - quiet mode", 35.00, 3.8),
 ]
 
 _AMAZON_REVIEW_TEMPLATES = [
     "Durability rated {durability}/5 in daily Lagos use. {sentiment} Price ₦{price_naira} felt {price_verdict}.",
     "{product}: build quality {quality}. Good for remote work / commute; tags: {tags}.",
-    "After {weeks} weeks — still holds charge/structure. {sentiment} Category: {category}.",
+    "After {weeks} weeks - still holds charge/structure. {sentiment} Category: {category}.",
 ]
 
 # --- Goodreads seeds ----------------------------------------------------------
@@ -136,15 +136,15 @@ _GOODREADS_BOOKS = [
 ]
 
 _MEDIA_TITLES = [
-    ("Nollywood Weekend Drama — streaming pick", "cinematic", ["nollywood", "weekend", "family"]),
+    ("Nollywood Weekend Drama - streaming pick", "cinematic", ["nollywood", "weekend", "family"]),
     ("Afrobeats Live Session Recording", "musical", ["afrobeats", "concert", "energy"]),
     ("African History Documentary Series", "documentary", ["history", "education", "culture"]),
-    ("Stand-up Comedy Special — Lagos", "humorous", ["comedy", "social", "night_out"]),
+    ("Stand-up Comedy Special - Lagos", "humorous", ["comedy", "social", "night_out"]),
 ]
 
 _GOODREADS_TEMPLATES = [
     "Narrative style: {style}. Themes: {themes}. {sentiment} Pacing suited a {mood} weekend read.",
-    "{title} — {sentiment} The {style} voice and tags {tags} match readers into {theme_primary}.",
+    "{title} - {sentiment} The {style} voice and tags {tags} match readers into {theme_primary}.",
     "Lagos/Nigeria context: {context}. {sentiment} Would recommend for {tag} lovers.",
 ]
 
@@ -296,7 +296,7 @@ def generate_goodreads_rows(n: int, rng: random.Random) -> List[Dict[str, Any]]:
         pool = _MEDIA_TITLES if is_media else _GOODREADS_BOOKS
         title, narrative_style, thematic_tags = pool[i % len(pool)]
         if i >= len(pool) and not is_media:
-            title = f"{title} — reader edition {i // len(pool) + 1}"
+            title = f"{title} - reader edition {i // len(pool) + 1}"
 
         sentiment = _pick_sentiment(rng)
         mood = rng.choice(["slow", "page-turner", "reflective", "weekend binge"])
@@ -346,7 +346,7 @@ def build_corpus(*, per_domain: int = 1000, seed: int = 42) -> Dict[str, Any]:
 
     return {
         "corpus_version": "1.0",
-        "description": "NaijaSense synthetic large corpus — Yelp / Amazon / Goodreads domains",
+        "description": "NaijaSense synthetic large corpus - Yelp / Amazon / Goodreads domains",
         "total_rows": len(records),
         "domains": {
             "yelp": len(yelp),

@@ -1,4 +1,4 @@
-"""Task B stage-2: router rank → generator paragraph (Groq default, optional Gemini)."""
+"""Task B stage-2: Groq router rank → Groq generator paragraph."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import List, Tuple
 
 from agents.task_b_errors import TaskBRerankError
 from core.candidate_catalog import CatalogItem
-from core.recommendation_items import display_domain
+from core.recommendation_items import canonical_item_title, display_domain
 from models.llm_wrapper import LLMWrapper
 from utils.config import settings
 from utils.task_schemas import TaskBRankResponse, TaskBResponse
@@ -16,9 +16,9 @@ from utils.task_schemas import TaskBRankResponse, TaskBResponse
 _NUMBERED_LIST_RE = re.compile(r"(?m)^\s*\d+[\.\)]\s+")
 
 _GENERATOR_FEW_SHOT = (
-    "EXAMPLE — student in Yaba on ₦10k/week, locked picks only:\n"
-    "Picks: Late-night Akara & Pap — Yaba | Nollywood weekend drama pick | "
-    "Local Jollof Kitchen — Surulere\n"
+    "EXAMPLE - student in Yaba on ₦10k/week, locked picks only:\n"
+    "Picks: Late-night Akara & Pap - Yaba | Nollywood weekend drama pick | "
+    "Local Jollof Kitchen - Surulere\n"
     "Paragraph: If you are stretching a tight weekly budget around Yaba, grab Late-night "
     "Akara & Pap for a cheap, filling bite before a Nollywood weekend drama pick with friends. "
     "When you want proper rice without Island prices, Local Jollof Kitchen in Surulere keeps "
@@ -26,7 +26,7 @@ _GENERATOR_FEW_SHOT = (
 )
 
 _ROUTER_SYSTEM = (
-    "You are a Nigerian cross-category recommendation ranker. Read ONLY the persona — "
+    "You are a Nigerian cross-category recommendation ranker. Read ONLY the persona - "
     "no separate search query. Reason about budget, location, and lifestyle, then rank "
     "exactly {top_k} item_id values from the candidate list (best-first). "
     "Output ONLY valid JSON: "
@@ -36,13 +36,13 @@ _ROUTER_SYSTEM = (
 )
 
 _GENERATOR_SYSTEM = (
-    "You are a Nigerian lifestyle recommendation writer. Write ONE fluid paragraph only "
-    "({sentence_count} sentences woven together). Rules: no numbered list, no bullets, no "
-    "markdown; vary sentence openings; mention each locked pick once by its human-readable "
-    "title; tie choices to budget/location from the persona; light Nigerian English is fine. "
-    "Do NOT repeat the same phrase (e.g. 'attract talent', 'top data scientists') more than "
-    "once. Do not give HR or recruiting advice — only concrete local picks. "
-    "Return ONLY the paragraph text — no JSON, no headings.\n\n"
+    "You are a Nigerian lifestyle recommendation writer. Write ONE tight paragraph "
+    "({sentence_count} sentences max). Rules: no numbered list, no bullets, no markdown; "
+    "mention each locked pick exactly ONCE using its display title; no repeated venue names; "
+    "no general life/career/education advice (do not say whether someone should learn AI, "
+    "change careers, etc.); only describe why each pick fits as a lifestyle/product choice. "
+    "Stay on-topic to the locked picks only - no digressions. "
+    "Return ONLY the paragraph text.\n\n"
     + _GENERATOR_FEW_SHOT
 )
 
@@ -54,8 +54,21 @@ _TEAM_CULTURE_ROUTER_EXTRA = (
 
 _TEAM_CULTURE_GENERATOR_EXTRA = (
     " The user mentioned hiring or founding a company. You are NOT an HR consultant. "
-    "Frame each pick as a welcome perk or team hangout in Lagos (meals, outings, culture) — "
+    "Frame each pick as a welcome perk or team hangout in Lagos (meals, outings, culture) - "
     "never as 'buy this to attract engineers'. Mention the company name at most once."
+)
+
+_ADVISORY_ROUTER_EXTRA = (
+    " The persona is general advice (learning/career), not a food outing request. "
+    "Rank study-friendly tech, books, or tools - avoid random restaurants unless clearly "
+    "study-relevant (e.g. cafe with wifi). Max one food pick."
+)
+
+_ADVISORY_GENERATOR_EXTRA = (
+    " CRITICAL: Do NOT answer whether the user should learn AI or any career question. "
+    "Do NOT write 'it is advisable' or similar. Start directly with lifestyle picks that "
+    "support someone upskilling (gear, books, quiet cafe). One sentence per pick; "
+    "each title appears once only."
 )
 
 
@@ -66,12 +79,12 @@ def rerank_task_b(
     top_k: int,
     pool: List[Tuple[CatalogItem, float]],
     team_culture_mode: bool = False,
+    advisory_only_mode: bool = False,
 ) -> TaskBResponse:
-    """Rank with router, write paragraph with generator; Gemini/fallback if Groq fails."""
-    mode = (settings.task_b_rerank_provider or "groq").lower().strip()
+    """Rank with Groq router, write paragraph with Groq generator; stage-1 fallback if Groq fails."""
     errors: list[str] = []
 
-    if mode in ("groq", "auto") and settings.groq_api_key:
+    if settings.groq_api_key:
         try:
             return _two_step_groq(
                 user_persona=user_persona,
@@ -79,22 +92,12 @@ def rerank_task_b(
                 top_k=top_k,
                 pool=pool,
                 team_culture_mode=team_culture_mode,
+                advisory_only_mode=advisory_only_mode,
             )
         except Exception as exc:
             errors.append(f"Groq two-step: {exc}")
-
-    if mode in ("gemini", "auto"):
-        try:
-            from agents.task_b_gemini import rerank_with_gemini
-
-            result = rerank_with_gemini(
-                user_persona=user_persona,
-                candidate_items_list=candidate_items_list,
-                top_k=top_k,
-            )
-            return _finalize_task_b_response(result)
-        except Exception as exc:
-            errors.append(f"Gemini: {exc}")
+    else:
+        errors.append("GROQ_API_KEY not set")
 
     if pool:
         return _paragraph_from_stage1(pool, top_k=top_k, errors=errors)
@@ -109,6 +112,7 @@ def _two_step_groq(
     top_k: int,
     pool: List[Tuple[CatalogItem, float]],
     team_culture_mode: bool = False,
+    advisory_only_mode: bool = False,
 ) -> TaskBResponse:
     rank = _router_rank(
         user_persona=user_persona,
@@ -116,6 +120,7 @@ def _two_step_groq(
         top_k=top_k,
         pool=pool,
         team_culture_mode=team_culture_mode,
+        advisory_only_mode=advisory_only_mode,
     )
     locked = _resolve_locked_picks(rank, pool, top_k=top_k)
     paragraph = _generator_paragraph(
@@ -123,8 +128,10 @@ def _two_step_groq(
         locked_picks=locked,
         top_k=top_k,
         team_culture_mode=team_culture_mode,
+        advisory_only_mode=advisory_only_mode,
     )
     paragraph = _polish_paragraph(paragraph)
+    paragraph = _collapse_duplicate_title_mentions(paragraph, locked)
     return TaskBResponse(agent_reasoning=rank.agent_reasoning.strip(), recommendations=paragraph)
 
 
@@ -135,6 +142,7 @@ def _router_rank(
     top_k: int,
     pool: List[Tuple[CatalogItem, float]],
     team_culture_mode: bool = False,
+    advisory_only_mode: bool = False,
 ) -> TaskBRankResponse:
     llm = LLMWrapper(role="router")
     user_msg = (
@@ -145,6 +153,8 @@ def _router_rank(
     system = _ROUTER_SYSTEM.format(top_k=top_k)
     if team_culture_mode:
         system += _TEAM_CULTURE_ROUTER_EXTRA
+    if advisory_only_mode:
+        system += _ADVISORY_ROUTER_EXTRA
     raw = llm.generate(
         user_msg,
         system=system,
@@ -180,10 +190,17 @@ def _heuristic_rank(
 ) -> List:
     from utils.task_schemas import TaskBRankedPick
 
-    return [
-        TaskBRankedPick(item_id=item.item_id, brief_why="stage-1 score")
-        for item, _ in pool[:top_k]
-    ]
+    picks: List[TaskBRankedPick] = []
+    seen: set[str] = set()
+    for item, _ in pool:
+        key = canonical_item_title(item.title).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        picks.append(TaskBRankedPick(item_id=item.item_id, brief_why="stage-1 score"))
+        if len(picks) >= top_k:
+            break
+    return picks
 
 
 def _resolve_locked_picks(
@@ -204,7 +221,23 @@ def _resolve_locked_picks(
                 locked.append(item)
             if len(locked) >= top_k:
                 break
-    return locked
+    return _dedupe_locked_by_title(locked)
+
+
+def _dedupe_locked_by_title(items: List[CatalogItem]) -> List[CatalogItem]:
+    seen: set[str] = set()
+    out: List[CatalogItem] = []
+    for item in items:
+        key = canonical_item_title(item.title).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
+
+def _display_title(item: CatalogItem) -> str:
+    return canonical_item_title(item.title)
 
 
 def _generator_paragraph(
@@ -213,23 +246,26 @@ def _generator_paragraph(
     locked_picks: List[CatalogItem],
     top_k: int,
     team_culture_mode: bool = False,
+    advisory_only_mode: bool = False,
 ) -> str:
     if not locked_picks:
         raise TaskBRerankError("No locked picks for paragraph generation.")
 
     pick_lines = "\n".join(
-        f"- {item.title.strip()} ({display_domain(item.domain)})" for item in locked_picks
+        f"- {_display_title(item)} ({display_domain(item.domain)})" for item in locked_picks
     )
     sentence_count = min(top_k, len(locked_picks))
     llm = LLMWrapper(role="generator")
     user_msg = (
         f"USER PERSONA:\n{user_persona}\n\n"
-        f"LOCKED PICKS (mention each by title — do not add other venues):\n{pick_lines}\n\n"
+        f"LOCKED PICKS (mention each by title - do not add other venues):\n{pick_lines}\n\n"
         "Write the recommendation paragraph now."
     )
     system = _GENERATOR_SYSTEM.format(sentence_count=sentence_count)
     if team_culture_mode:
         system += _TEAM_CULTURE_GENERATOR_EXTRA
+    if advisory_only_mode:
+        system += _ADVISORY_GENERATOR_EXTRA
 
     for attempt in range(2):
         raw = llm.generate(
@@ -241,9 +277,63 @@ def _generator_paragraph(
         paragraph = _clean_paragraph(raw)
         if len(paragraph) >= 80 and not _NUMBERED_LIST_RE.search(paragraph):
             if _paragraph_mentions_picks(paragraph, locked_picks, min_hits=max(1, len(locked_picks) - 1)):
-                return paragraph
+                if not _paragraph_has_title_repetition(paragraph, locked_picks):
+                    if not _paragraph_has_advisory_digression(paragraph, advisory_only_mode):
+                        return paragraph
 
     raise TaskBRerankError("Generator failed to produce a grounded recommendation paragraph.")
+
+
+_ADVISORY_DIGRESSION_RE = re.compile(
+    r"\b(it is advisable|is indeed advisable|you should learn|in this century|"
+    r"learning ai|artificial intelligence is|career advice)\b",
+    re.I,
+)
+
+
+def _paragraph_has_advisory_digression(paragraph: str, advisory_only_mode: bool) -> bool:
+    if not advisory_only_mode:
+        return False
+    return bool(_ADVISORY_DIGRESSION_RE.search(paragraph))
+
+
+def _paragraph_has_title_repetition(paragraph: str, picks: List[CatalogItem]) -> bool:
+    lower = paragraph.lower()
+    for item in picks:
+        base = canonical_item_title(item.title).lower()
+        if len(base) < 6:
+            continue
+        if lower.count(base) > 1:
+            return True
+        # Short brand token repeated too often (e.g. "local jollof kitchen" x5)
+        token = base.split(" - ")[0].strip()[:24]
+        if len(token) > 8 and lower.count(token) > 1:
+            return True
+    return False
+
+
+def _collapse_duplicate_title_mentions(paragraph: str, picks: List[CatalogItem]) -> str:
+    """Drop repeated sentences that re-use the same venue name."""
+    if not _paragraph_has_title_repetition(paragraph, picks):
+        return paragraph
+    seen: set[str] = set()
+    kept: list[str] = []
+    for sentence in re.split(r"(?<=[.!?])\s+", paragraph):
+        s = sentence.strip()
+        if not s:
+            continue
+        lower = s.lower()
+        duplicate = False
+        for item in picks:
+            base = canonical_item_title(item.title).lower()
+            if len(base) >= 8 and base in lower:
+                if base in seen:
+                    duplicate = True
+                    break
+                seen.add(base)
+        if not duplicate:
+            kept.append(s)
+    return " ".join(kept) if kept else paragraph
 
 
 def _paragraph_mentions_picks(
@@ -255,7 +345,7 @@ def _paragraph_mentions_picks(
     lower = paragraph.lower()
     hits = 0
     for item in picks:
-        title = (item.title or "").lower()
+        title = canonical_item_title(item.title or "").lower()
         tokens = [t for t in re.findall(r"[a-z0-9]+", title) if len(t) > 3]
         if not tokens:
             continue
@@ -271,6 +361,11 @@ def _polish_paragraph(text: str) -> str:
     """Trim repetitive boilerplate common in founder/hiring personas."""
     out = text
     for phrase in (
+        "learning ai in this century is indeed advisable",
+        "learning ai in this century is advisable",
+        "it is advisable",
+        "is indeed advisable",
+        "in this century",
         "to attract top tech talent",
         "to attract top data scientists",
         "to attract and retain top talent",
@@ -324,17 +419,6 @@ def _paragraph_from_stage1(
         f"Prose assembled locally ({note})."
     )
     return TaskBResponse(agent_reasoning=reasoning, recommendations=" ".join(sentences))
-
-
-def _finalize_task_b_response(result: TaskBResponse) -> TaskBResponse:
-    paragraph = (result.recommendations or "").strip()
-    if len(paragraph) < 80:
-        raise TaskBRerankError("Recommendations paragraph too short.")
-    if _NUMBERED_LIST_RE.search(paragraph):
-        raise TaskBRerankError("Recommendations must be prose, not a numbered list.")
-    if not (result.agent_reasoning or "").strip():
-        raise TaskBRerankError("agent_reasoning is empty.")
-    return result
 
 
 def _parse_json(raw: str) -> dict:

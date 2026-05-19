@@ -24,6 +24,7 @@ class ParsedPersona:
     budget_sensitive: bool = False
     cold_start: bool = False
     team_culture_mode: bool = False
+    advisory_only_mode: bool = False
     retrieval_context: str = ""
 
 
@@ -78,5 +79,6 @@ def parse_task_b_persona(persona_text: str, *, user_id: str = "") -> ParsedPerso
         budget_sensitive=budget_sensitive,
         cold_start=cold_start,
         team_culture_mode=intent.team_culture_mode,
+        advisory_only_mode=intent.advisory_only_mode,
         retrieval_context=intent.retrieval_context,
     )

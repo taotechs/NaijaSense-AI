@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 
 from core.persona_parser import parse_task_b_persona
 
-# Product-domain detection (from Product Details text only — not persona interests).
+# Product-domain detection (from Product Details text only - not persona interests).
 _DOMAIN_RULES: dict[str, dict[str, object]] = {
     "food": {
         "keywords": (
@@ -132,7 +132,7 @@ def domain_prompt_block(product_domain: str) -> str:
     lines = [
         f"PRODUCT DOMAIN (from Product Details only): {label}",
         f"Use ONLY vocabulary and trade-offs relevant to {label}: {trade_offs}.",
-        "The User Persona shapes your tone and priorities — it is NOT the subject of the review.",
+        "The User Persona shapes your tone and priorities - it is NOT the subject of the review.",
     ]
     if product_domain != "food":
         forbidden = meta.get("forbidden_unless_food", "portion, jollof, amala, suya, plate, buka")
@@ -140,7 +140,7 @@ def domain_prompt_block(product_domain: str) -> str:
             f"FORBIDDEN unless the product is food: {forbidden}."
         )
     lines.append(
-        "Perspective: first-person — you ARE the User Persona reviewing the product/experience "
+        "Perspective: first-person - you ARE the User Persona reviewing the product/experience "
         "described in Product Details."
     )
     return "\n".join(lines)

@@ -9,10 +9,10 @@ Goal: publish a public URL with FastAPI on one host and Next.js on another. Both
 
 This repository already includes:
 
-- `koyeb.yaml` — Koyeb app definition, deploys the existing `Dockerfile` (primary path).
-- `render.yaml` — Render blueprint, also deploys the existing `Dockerfile` (alternative path for Render deployments).
-- `Dockerfile` — honors `$PORT`, portable across Koyeb / Render / Fly / HF Spaces / local compose.
-- CORS in `api/app.py` — driven by `CORS_ORIGINS` env so deployment domains can be whitelisted.
+- `koyeb.yaml` - Koyeb app definition, deploys the existing `Dockerfile` (primary path).
+- `render.yaml` - Render blueprint, also deploys the existing `Dockerfile` (alternative path for Render deployments).
+- `Dockerfile` - honors `$PORT`, portable across Koyeb / Render / Fly / HF Spaces / local compose.
+- CORS in `api/app.py` - driven by `CORS_ORIGINS` env so deployment domains can be whitelisted.
 
 ---
 
@@ -55,7 +55,7 @@ Required accounts (all support free tiers and GitHub sign-in):
 2. Click **Import** on this repo.
 3. In the import wizard:
    - **Root Directory**: click **Edit** → select `frontend` (this is the only non-default field).
-   - **Framework Preset**: Vercel auto-detects Next.js — leave as-is.
+   - **Framework Preset**: Vercel auto-detects Next.js - leave as-is.
 4. Open **Environment Variables** and add:
    - `NEXT_PUBLIC_AGENT_API_URL` = `https://<koyeb-url>/api/agent/v1`
      (e.g. `https://youthful-wynn-taotechs-6715c87e.koyeb.app/api/agent/v1`)
@@ -94,7 +94,7 @@ curl -X POST https://<koyeb-url>/api/agent/v1 \
       "location": "Lagos",
       "interests": ["food", "nightlife"]
     },
-    "query": "Review the new Suya spot in Ikeja — went on Friday, queue was long but yaji on point."
+    "query": "Review the new Suya spot in Ikeja - went on Friday, queue was long but yaji on point."
   }'
 ```
 

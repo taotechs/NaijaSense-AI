@@ -71,7 +71,7 @@ def _seed_rows(seed_path: Path) -> Iterator[Dict[str, Any]]:
 def _synthetic_variants(base: Dict[str, Any], n: int, rng: random.Random) -> Iterator[Dict[str, Any]]:
     locations = ["Yaba, Lagos", "VI, Lagos", "Abuja Wuse", "Port Harcourt", "Ikeja"]
     prefixes = [
-        "Paid about ₦{price} — ",
+        "Paid about ₦{price} - ",
         "For the money at ₦{price}, ",
         "Honestly at ₦{price} ",
     ]
@@ -103,7 +103,7 @@ def build_corpus(*, rows: int, output: Path, seed_path: Path) -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
     seeds = [_enrich_row(r, i) for i, r in enumerate(_seed_rows(seed_path))]
     if not seeds:
-        raise SystemExit("No seed rows found — add data/processed/review_corpus.jsonl first.")
+        raise SystemExit("No seed rows found - add data/processed/review_corpus.jsonl first.")
 
     written = 0
     with output.open("w", encoding="utf-8") as handle:

@@ -97,7 +97,7 @@ class NaijaSenseOrchestrator:
     ) -> None:
         # Cheap/fast model for persona inference and any classification-style calls.
         router_llm = LLMWrapper(role="router")
-        # Strong model for review writing — higher temperature and diversity controls
+        # Strong model for review writing - higher temperature and diversity controls
         # are applied per-call inside the agent.
         generator_llm = LLMWrapper(role="generator")
         self.user_modeling_agent = UserModelingAgent(llm=router_llm)
@@ -171,7 +171,7 @@ class NaijaSenseOrchestrator:
                 "persist_review_to_memory",
             ],
             rationale=(
-                "Silent-history first, then persona, then generation — so the "
+                "Silent-history first, then persona, then generation - so the "
                 "review is conditioned on the user's actual past behaviour."
             ),
         )
@@ -212,7 +212,7 @@ class NaijaSenseOrchestrator:
         if on_step:
             on_step({"type": "plan", "flow": plan.flow_name, "steps": plan.steps})
 
-        # Step 1 — silent context retrieval (skipped on demand for A/B compare).
+        # Step 1 - silent context retrieval (skipped on demand for A/B compare).
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[0]})
         if on_step:
             on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[0]})
@@ -243,7 +243,7 @@ class NaijaSenseOrchestrator:
         if on_step:
             on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[0]})
 
-        # Step 2 — reasoning about persona strategy.
+        # Step 2 - reasoning about persona strategy.
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[1]})
         if on_step:
             on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[1]})
@@ -258,7 +258,7 @@ class NaijaSenseOrchestrator:
         if on_step:
             on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[1]})
 
-        # Step 3 — build persona (history + UI override).
+        # Step 3 - build persona (history + UI override).
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[2]})
         if on_step:
             on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[2]})
@@ -291,7 +291,7 @@ class NaijaSenseOrchestrator:
         if on_step:
             on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[2]})
 
-        # Step 4 — generate review.
+        # Step 4 - generate review.
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[3]})
         if on_step:
             on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[3]})
@@ -335,13 +335,13 @@ class NaijaSenseOrchestrator:
         if on_step:
             on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[3]})
 
-        # Step 5 — persist to memory.
+        # Step 5 - persist to memory.
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[4]})
         if on_step:
             on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[4]})
         memory_note = f"Reviewed {request.item_data.item_name}: {review_output['review_text']}"
         # In skip_history A/B mode we do NOT want to pollute the user's memory
-        # with the no-history variant — that would corrupt the next request's
+        # with the no-history variant - that would corrupt the next request's
         # baseline. The main pass still writes to memory.
         if not skip_history:
             self.user_memory.save_interaction(user_id=request.user_profile.user_id, content=memory_note)
@@ -390,7 +390,7 @@ class NaijaSenseOrchestrator:
         if on_step:
             on_step({"type": "plan", "flow": plan.flow_name, "steps": plan.steps})
 
-        # Step 1 — silent context retrieval (skipped on demand for A/B compare).
+        # Step 1 - silent context retrieval (skipped on demand for A/B compare).
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[0]})
         if on_step:
             on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[0]})
@@ -420,7 +420,7 @@ class NaijaSenseOrchestrator:
         if on_step:
             on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[0]})
 
-        # Step 2 — reason about retrieval strategy (chain-of-thought line).
+        # Step 2 - reason about retrieval strategy (chain-of-thought line).
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[1]})
         if on_step:
             on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[1]})
@@ -450,7 +450,7 @@ class NaijaSenseOrchestrator:
         if on_step:
             on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[1]})
 
-        # Step 3 — retrieve relevant memory (which now includes history).
+        # Step 3 - retrieve relevant memory (which now includes history).
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[2]})
         if on_step:
             on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[2]})
@@ -475,7 +475,7 @@ class NaijaSenseOrchestrator:
         if on_step:
             on_step({"type": "step_end", "flow": plan.flow_name, "step": plan.steps[2]})
 
-        # Step 4 — rank.
+        # Step 4 - rank.
         self._emit("before_step", {"flow": plan.flow_name, "step": plan.steps[3]})
         if on_step:
             on_step({"type": "step_start", "flow": plan.flow_name, "step": plan.steps[3]})

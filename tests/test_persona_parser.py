@@ -19,9 +19,15 @@ def test_taotech_does_not_trigger_tech_domain() -> None:
     assert "tech" not in parsed.domains
 
 
+def test_learning_ai_advisory_only_mode() -> None:
+    parsed = parse_task_b_persona("learning AI in this century is advised?")
+    assert parsed.advisory_only_mode
+    assert "food" not in parsed.domains or "tech" in parsed.domains
+
+
 def test_founder_hiring_team_culture() -> None:
     parsed = parse_task_b_persona(
-        "Founder in Lagos — how do I get great data scientists to join my startup?"
+        "Founder in Lagos - how do I get great data scientists to join my startup?"
     )
     assert parsed.team_culture_mode
     assert "food" in parsed.domains or "experiences" in parsed.domains

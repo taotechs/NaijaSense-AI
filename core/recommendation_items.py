@@ -2,7 +2,7 @@
 Curated recommendable products for Task B (not raw review rows).
 
 Stage-1 retrieval targets real items (Food, Movie, Drink, etc.) with human-readable
-titles — never review-dataset placeholders like ``yelp_review`` or ``hf_yelp_*``.
+titles - never review-dataset placeholders like ``yelp_review`` or ``hf_yelp_*``.
 """
 
 from __future__ import annotations
@@ -175,15 +175,27 @@ def curated_catalog_items() -> List[CatalogItem]:
     return items
 
 
+_VARIANT_SUFFIX_RE = re.compile(r"\s*#\d+\s*$", re.I)
+_VARIANT_PAREN_RE = re.compile(r"\s*\(variant\s+\d+\)\s*$", re.I)
+
+
+def canonical_item_title(title: str) -> str:
+    """Collapse corpus variants like 'Local Jollof Kitchen - Surulere #19' → base name."""
+    t = (title or "").strip()
+    t = _VARIANT_SUFFIX_RE.sub("", t)
+    t = _VARIANT_PAREN_RE.sub("", t)
+    return t.strip() or "local pick"
+
+
 def merge_unique_items(
     candidates: List[Tuple[CatalogItem, float]],
     *,
     limit: int,
 ) -> List[Tuple[CatalogItem, float]]:
-    """Deduplicate by normalized title, keep highest score."""
+    """Deduplicate by canonical title, keep highest score."""
     by_title: Dict[str, Tuple[CatalogItem, float]] = {}
     for item, score in candidates:
-        key = item.title.strip().lower()
+        key = canonical_item_title(item.title).lower()
         if key not in by_title or score > by_title[key][1]:
             by_title[key] = (item, score)
     merged = sorted(by_title.values(), key=lambda x: x[1], reverse=True)

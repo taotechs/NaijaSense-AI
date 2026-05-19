@@ -2,7 +2,7 @@
 Ensure corpus_index.json exists and indexes the full review_corpus.jsonl.
 
 Task A (few-shots) and Task B (stage-1 retrieval) both read from the same
-5k+ row corpus via the inverted index — no separate 3k synthetic pool.
+5k+ row corpus via the inverted index - no separate 3k synthetic pool.
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ def ensure_corpus_index(*, force: bool = False) -> Path:
 
     if not force and corpus_is_ready(corpus_path=corpus_path, index_path=index_path):
         n = count_corpus_rows(corpus_path)
-        print(f"[corpus] OK — {n} rows indexed at {index_path}")
+        print(f"[corpus] OK - {n} rows indexed at {index_path}")
         return corpus_path
 
     if not corpus_path.exists():
@@ -107,7 +107,7 @@ def ensure_corpus_index(*, force: bool = False) -> Path:
 
 
 def ensure_large_corpus(*, rows: int | None = None, force: bool = False) -> Path:
-    """Backward-compatible entrypoint (``rows`` ignored — uses full review corpus)."""
+    """Backward-compatible entrypoint (``rows`` ignored - uses full review corpus)."""
     _ = rows
     return ensure_corpus_index(force=force)
 

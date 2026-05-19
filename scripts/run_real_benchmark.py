@@ -14,10 +14,10 @@ Task B (recommendation):
     - Metrics:  NDCG@10, HitRate@10
 
 Variants (ablations):
-    - full           — production pipeline
-    - no_rag         — corpus_store returns no examples
-    - no_critique    — critique → regenerate disabled
-    - no_llm         — provider="none", deterministic fallback only
+    - full           - production pipeline
+    - no_rag         - corpus_store returns no examples
+    - no_critique    - critique → regenerate disabled
+    - no_llm         - provider="none", deterministic fallback only
 
 Usage::
 
@@ -167,7 +167,7 @@ def _evaluate_task_a(rows: Sequence[CorpusRow], orchestrator: NaijaSenseOrchestr
             tone_preference="casual",
         )
         # Important: deliberately do NOT pass the gold review text as item_context
-        # — that would leak the target. The agent must infer from item_name alone.
+        # - that would leak the target. The agent must infer from item_name alone.
         req = ReviewSimulationRequest(
             user_profile=profile,
             item_data=ItemData(item_name=row.item_name, item_context=""),
@@ -284,11 +284,11 @@ def _run_single_variant(
         orchestrator = _build_orchestrator(variant)
         result: Dict[str, Any] = {"variant": variant, "sample_size": len(sample)}
         if task in ("a", "both"):
-            print(f"  [{variant}] Task A — generating {len(sample)} reviews...")
+            print(f"  [{variant}] Task A - generating {len(sample)} reviews...")
             result["task_a"] = _evaluate_task_a(sample, orchestrator)
             print(f"  [{variant}] Task A done: {result['task_a']}")
         if task in ("b", "both"):
-            print(f"  [{variant}] Task B — ranking with distractors...")
+            print(f"  [{variant}] Task B - ranking with distractors...")
             result["task_b"] = _evaluate_task_b(sample, rows, orchestrator, rng)
             print(f"  [{variant}] Task B done: {result['task_b']}")
     return result

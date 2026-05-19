@@ -7,7 +7,7 @@ honoured for both OpenAI and Groq providers so repeated calls actually
 produce different text.
 
 The fallback path returns an *empty* response (not the prompt) so callers
-must explicitly decide what to do when no provider is configured — this
+must explicitly decide what to do when no provider is configured - this
 prevents the prompt from accidentally leaking into user-facing output.
 """
 
@@ -143,7 +143,7 @@ class LLMWrapper:
         """Generate text from ``prompt``.
 
         Returns ``LLMResponse(text="")`` when no provider is configured or the
-        call fails. Callers MUST handle the empty case explicitly — we never
+        call fails. Callers MUST handle the empty case explicitly - we never
         echo the prompt back as fake output.
         """
         sampling = self._resolve_sampling(

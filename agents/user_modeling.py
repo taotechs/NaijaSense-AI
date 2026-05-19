@@ -8,7 +8,7 @@ workflow:
    interests) for the incoming ``user_id``.
 2. This agent treats that summary as the **baseline persona**.
 3. The UI-supplied :class:`utils.schemas.UserProfile` fields then act as
-   **explicit overrides** — but only where the user actually set them.
+   **explicit overrides** - but only where the user actually set them.
    This is the bit the brief calls out: persona settings on the screen
    are an override, not a replacement.
 4. The returned ``merge_meta`` lists exactly which fields were

@@ -8,12 +8,12 @@
  * and exposes the result as a tiny pill the user can see at a glance.
  *
  * States:
- *   - "checking"   — initial; we haven't heard back yet.
- *   - "ready"      — backend returned 200 within the timeout.
- *   - "waking"     — the first request took >2s; we're showing this so the
+ *   - "checking"   - initial; we haven't heard back yet.
+ *   - "ready"      - backend returned 200 within the timeout.
+ *   - "waking"     - the first request took >2s; we're showing this so the
  *                    user knows why "Send to agent" might lag on the very
  *                    first interaction after the service has been idle.
- *   - "down"       — the request errored out / timed out.
+ *   - "down"       - the request errored out / timed out.
  *
  * Re-checks every 60s while the page is visible, so a recovered backend
  * surfaces without a page reload.

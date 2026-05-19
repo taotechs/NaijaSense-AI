@@ -11,7 +11,7 @@ gets:
   dominant domains/interests, simple tone signal)
 
 When the ``user_id`` is unknown we degrade gracefully to empty results so
-the rest of the pipeline keeps working — the UI-supplied persona then
+the rest of the pipeline keeps working - the UI-supplied persona then
 acts as the primary signal instead of an override. This module has no
 runtime dependencies beyond the stdlib, so the container build stays
 unchanged.
@@ -171,7 +171,7 @@ class HistoricalUserStore:
         """Derive a behavioural baseline from past reviews.
 
         Returns an empty ``HistoricalPersona`` (``is_empty() is True``)
-        for unknown users — callers must handle this explicitly so the
+        for unknown users - callers must handle this explicitly so the
         UI-supplied persona can take over.
         """
         rows = self._by_user.get(user_id, [])

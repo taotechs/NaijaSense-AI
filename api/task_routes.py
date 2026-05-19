@@ -58,11 +58,11 @@ def _normalise_language(raw: str | None) -> str:
 _TASK_A_EXAMPLE = {
     "user_persona": (
         "Lagos-based foodie in Yaba, mid-20s, balanced but honest reviewer. "
-        "Cares about value-for-money, wait times, and authentic local taste — "
+        "Cares about value-for-money, wait times, and authentic local taste - "
         "writes in relatable Nigerian English, not overly formal."
     ),
     "product_details": (
-        "Iya Eba Amala Spot — Saturday lunch with a friend. Amala was soft, "
+        "Iya Eba Amala Spot - Saturday lunch with a friend. Amala was soft, "
         "egusi rich without too much oil, about ₦2,000 each, waited roughly 20 minutes."
     ),
 }
@@ -73,7 +73,7 @@ _TASK_B_EXAMPLE = {
         "persona": (
             "I'm a 22-year-old UNILAG student living in Yaba on a tight ₦10k weekly budget. "
             "I love affordable street food and jollof spots, weekend Nollywood movies with friends, "
-            "and occasional smoothies — value-for-money matters more than luxury."
+            "and occasional smoothies - value-for-money matters more than luxury."
         ),
     },
 }
@@ -83,7 +83,7 @@ _TASK_B_EXAMPLE = {
 def task_a_user_modeling_get() -> HTMLResponse:
     return HTMLResponse(
         task_endpoint_html(
-            task_name="Task A — User modeling",
+            task_name="Task A - User modeling",
             path="/task-a/user-modeling",
             description="Input: user_persona + product_details strings. Output: rating + review_text.",
             example_body=_TASK_A_EXAMPLE,
@@ -95,7 +95,7 @@ def task_a_user_modeling_get() -> HTMLResponse:
 def task_b_recommendation_get() -> HTMLResponse:
     return HTMLResponse(
         task_endpoint_html(
-            task_name="Task B — Recommendation",
+            task_name="Task B - Recommendation",
             path="/task-b/recommendation",
             description="Input: user_persona only. Output: recommendations (paragraph) + agent_reasoning.",
             example_body=_TASK_B_EXAMPLE,
@@ -158,7 +158,7 @@ def task_b_recommendation(payload: TaskBRequest) -> TaskBResponse:
         api_logger.warning("task-b validation error: %s", exc)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except TaskBRerankError as exc:
-        api_logger.error("task-b gemini rerank failed: %s", exc)
+        api_logger.error("task-b rerank failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),

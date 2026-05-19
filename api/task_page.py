@@ -20,7 +20,7 @@ def task_endpoint_html(
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NaijaSense AI — {task_name}</title>
+  <title>NaijaSense AI - {task_name}</title>
   <style>
     body {{ font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0;
            max-width: 720px; margin: 0 auto; padding: 1.5rem; line-height: 1.5; }}
@@ -40,7 +40,7 @@ def task_endpoint_html(
   <div class="warn">
     <strong>This URL is an API endpoint.</strong> Opening it in a browser sends
     <code>GET</code>, but the hackathon contract requires <code>{method}</code> with a JSON body.
-    Call this endpoint with Swagger, curl, or any HTTP client — not the address bar alone.
+    Call this endpoint with Swagger, curl, or any HTTP client - not the address bar alone.
   </div>
   <h2>How to call it</h2>
   <p><code>{method} {path}</code><br/>Content-Type: <code>application/json</code></p>

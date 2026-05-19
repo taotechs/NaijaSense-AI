@@ -1,4 +1,4 @@
-"""Root landing page — dual submission task links."""
+"""Root landing page - dual submission task links."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def _landing_html(*, api_base: str = "") -> str:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NaijaSense AI — DSN × BCT LLM Agent Challenge</title>
+  <title>NaijaSense AI - DSN × BCT LLM Agent Challenge</title>
   <style>
     :root {{ font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: #0f172a; color: #e2e8f0; }}
     body {{ max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem; line-height: 1.55; }}
@@ -42,14 +42,14 @@ def _landing_html(*, api_base: str = "") -> str:
   <p>Two containerized task endpoints for the competition. Use the API URLs below as your agent links.</p>
 
   <div class="card">
-    <h2>Task A — User modeling</h2>
+    <h2>Task A - User modeling</h2>
     <p><strong>API (POST):</strong> <a href="{task_a_api}">{task_a_api}</a></p>
     <p><strong>Demo UI:</strong> <a href="{task_a_ui}">{task_a_ui}</a></p>
     <p>Input: <code>user_persona</code> + <code>product_details</code> · Output: <code>rating</code>, <code>review_reasoning</code>, <code>review_text</code></p>
   </div>
 
   <div class="card">
-    <h2>Task B — Recommendation</h2>
+    <h2>Task B - Recommendation</h2>
     <p><strong>API (POST):</strong> <a href="{task_b_api}">{task_b_api}</a></p>
     <p><strong>Demo UI:</strong> <a href="{task_b_ui}">{task_b_ui}</a></p>
     <p>Input: <code>user_persona.persona</code> only · Output: <code>recommendations</code> (paragraph) + <code>agent_reasoning</code></p>
@@ -58,7 +58,7 @@ def _landing_html(*, api_base: str = "") -> str:
   <div class="card">
     <h2>Also useful</h2>
     <ul>
-      <li><a href="{docs}">OpenAPI / Swagger</a> — try both endpoints interactively</li>
+      <li><a href="{docs}">OpenAPI / Swagger</a> - try both endpoints interactively</li>
       <li><a href="{health}">Health check</a></li>
       <li>Legacy unified agent: <code>POST /api/agent/v1</code></li>
       <li>Interactive hub UI: <code>/unified</code> (Next.js frontend)</li>

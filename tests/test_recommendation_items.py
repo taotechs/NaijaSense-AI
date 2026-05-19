@@ -1,11 +1,22 @@
 """Tests for Task B display item resolution."""
 
 from core.recommendation_items import (
+    canonical_item_title,
     is_placeholder_item_name,
+    merge_unique_items,
     resolve_display_item,
     curated_catalog_items,
 )
+from core.candidate_catalog import CatalogItem
 from core.corpus_index import LargeCorpusIndex
+
+
+def test_canonical_title_collapses_variants() -> None:
+    assert canonical_item_title("Local Jollof Kitchen - Surulere #19") == "Local Jollof Kitchen - Surulere"
+    a = CatalogItem("a", "Local Jollof Kitchen - Surulere #1", "food", ("jollof",))
+    b = CatalogItem("b", "Local Jollof Kitchen - Surulere #2", "food", ("jollof",))
+    merged = merge_unique_items([(a, 0.9), (b, 0.8)], limit=5)
+    assert len(merged) == 1
 
 
 def test_rejects_yelp_placeholder() -> None:

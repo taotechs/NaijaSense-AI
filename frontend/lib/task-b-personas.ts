@@ -14,7 +14,7 @@ export const TASK_B_PERSONA_PRESETS: PersonaPreset[] = [
     user_id: "demo_student",
     persona:
       "I'm a 22-year-old UNILAG student in Yaba with about ₦10k per week for fun and food. " +
-      "I want cheap jollof and suya spots, low-cost weekend Nollywood with friends, and occasional smoothies — " +
+      "I want cheap jollof and suya spots, low-cost weekend Nollywood with friends, and occasional smoothies - " +
       "never premium Island prices.",
   },
   {

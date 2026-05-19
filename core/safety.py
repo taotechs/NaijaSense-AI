@@ -1,6 +1,6 @@
 """Lightweight safety / validation layer for the agent gateway.
 
-Two responsibilities, both *advisory* — we never block a request, we just
+Two responsibilities, both *advisory* - we never block a request, we just
 annotate the response with a ``safety_flags`` list so the UI can show a
 badge and the team can audit later.
 
@@ -16,7 +16,7 @@ badge and the team can audit later.
    - PII leakage in generated text.
    - Hallucinated specifics: numeric facts (prices, ratings, dates) that
      appear in the output but are not grounded in the input. The check is
-     intentionally conservative — we only flag when a specific numeric
+     intentionally conservative - we only flag when a specific numeric
      token cannot be matched against the original ``query`` /
      ``item_context``.
 

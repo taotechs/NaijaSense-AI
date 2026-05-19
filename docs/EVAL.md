@@ -8,8 +8,8 @@ For every eligible user (anyone in the corpus with ≥2 reviews) we:
 
 1. **Hold out the user's last review** as ground truth.
 2. **Run the agent twice** on the same query, generated from the held-out item:
-   - **With history** (`include_history=True`) — full production pipeline. Silent retrieval pulls the user's earlier reviews, derives a behavioural baseline persona, and conditions the generator on it.
-   - **Without history** (`include_history=False`) — same pipeline, silent retrieval skipped. The UI-supplied persona is the only signal.
+   - **With history** (`include_history=True`) - full production pipeline. Silent retrieval pulls the user's earlier reviews, derives a behavioural baseline persona, and conditions the generator on it.
+   - **Without history** (`include_history=False`) - same pipeline, silent retrieval skipped. The UI-supplied persona is the only signal.
 3. **Score each generated review** against the held-out ground truth on three axes:
 
 | Metric | What it captures | Range |
@@ -19,7 +19,7 @@ For every eligible user (anyone in the corpus with ≥2 reviews) we:
 | `tone_match`   | Boolean: does the generated tone bucket (slang / casual / formal) match the user's true tone bucket? | 0 or 1 |
 | `fidelity`     | Composite: `0.4 * (1 - rating_err/4) + 0.4 * text_cosine + 0.2 * tone_match` | 0 → 1 |
 
-The composite is intentionally biased toward rating + textual alignment because tone is already a noisy bucket — we keep it as a 20% tiebreaker.
+The composite is intentionally biased toward rating + textual alignment because tone is already a noisy bucket - we keep it as a 20% tiebreaker.
 
 ## Running the eval
 
@@ -33,8 +33,8 @@ python scripts/eval_fidelity.py --limit 30 --base-url https://youthful-wynn-taot
 
 Outputs are written to `data/eval/`:
 
-- `fidelity_results.jsonl` — per-sample raw scores for both modes.
-- `fidelity_summary.json`  — aggregated means + the **delta** between modes.
+- `fidelity_results.jsonl` - per-sample raw scores for both modes.
+- `fidelity_summary.json`  - aggregated means + the **delta** between modes.
 
 A non-zero `delta.fidelity` in favour of `with_history` is the proof point.
 
@@ -52,10 +52,10 @@ The summary block looks like:
 
 Interpretation:
 
-- **`delta.fidelity = +0.14`** — silent retrieval improves the composite score by 14 fidelity points on average.
-- **`delta.rating_error = +0.48`** — predicted rating is **0.48 stars closer** to truth when history is used.
-- **`delta.text_cosine = +0.12`** — generated text shares meaningfully more vocabulary with the user's real review.
-- **`delta.tone_match_pct = +15.0`** — tone bucket alignment goes up 15 percentage points.
+- **`delta.fidelity = +0.14`** - silent retrieval improves the composite score by 14 fidelity points on average.
+- **`delta.rating_error = +0.48`** - predicted rating is **0.48 stars closer** to truth when history is used.
+- **`delta.text_cosine = +0.12`** - generated text shares meaningfully more vocabulary with the user's real review.
+- **`delta.tone_match_pct = +15.0`** - tone bucket alignment goes up 15 percentage points.
 
 The numbers above are illustrative; results vary by model choice, sample size, and seed.
 

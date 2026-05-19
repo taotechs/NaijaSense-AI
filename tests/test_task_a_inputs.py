@@ -6,7 +6,7 @@ from core.task_a_inputs import domain_prompt_block, infer_product_domain, parse_
 def test_parse_unified_strings() -> None:
     parsed = parse_task_a_inputs(
         "Yaba student, critical reviewer on a budget, casual Nigerian English.",
-        "Iya Eba Amala Spot — lunch, ₦2k, 20 min wait, soft amala.",
+        "Iya Eba Amala Spot - lunch, ₦2k, 20 min wait, soft amala.",
     )
     assert "Amala" in parsed.item_name
     assert parsed.item_context
@@ -16,7 +16,7 @@ def test_parse_unified_strings() -> None:
 
 def test_infer_tech_domain() -> None:
     domain = infer_product_domain(
-        "Taotech Solutions — B2B software platform for SMEs. Onboarding took 2 days, API stable.",
+        "Taotech Solutions - B2B software platform for SMEs. Onboarding took 2 days, API stable.",
         "Taotech Solutions",
     )
     assert domain == "tech"

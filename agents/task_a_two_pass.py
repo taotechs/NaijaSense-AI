@@ -1,4 +1,4 @@
-"""Task A — two-pass star rating then aligned review (RMSE / fidelity)."""
+"""Task A - two-pass star rating then aligned review (RMSE / fidelity)."""
 
 from __future__ import annotations
 
@@ -157,7 +157,7 @@ class TaskATwoPassAgent:
             f"{_PERSPECTIVE_RULE}\n"
             "STEP 1: Read Product Details and identify the product domain "
             "(Food, Tech/Software, Service, Book, Hospitality, etc.).\n"
-            "STEP 2: Use the User Persona only to decide tone and how strictly you score — "
+            "STEP 2: Use the User Persona only to decide tone and how strictly you score - "
             "not to change what product is being rated.\n"
             "Output ONLY valid JSON: "
             '{"rating": float 1.0-5.0, "review_reasoning": "2-3 sentences"}.\n'
@@ -166,7 +166,7 @@ class TaskATwoPassAgent:
         user_msg = (
             f"{domain_block}\n\n"
             f"{few_shot_block}\n\n"
-            f"USER PERSONA (voice + priorities — NOT the product being rated):\n{persona_text}\n\n"
+            f"USER PERSONA (voice + priorities - NOT the product being rated):\n{persona_text}\n\n"
             f"PRODUCT DETAILS (subject of the review):\n"
             f"- name: {item_name}\n"
             f"- details: {item_context or '(none)'}\n\n"
@@ -219,7 +219,7 @@ class TaskATwoPassAgent:
             f"{_PERSPECTIVE_RULE}\n"
             f"{domain_block}\n"
             f"{few_shot_block}\n"
-            "CRITICAL — RATING LOCK:\n"
+            "CRITICAL - RATING LOCK:\n"
             "- Pass 1 already set the star rating. Your prose MUST match that exact score.\n"
             "- Explicitly justify the locked rating using ONLY domain-appropriate trade-offs.\n"
             "- Do not contradict the score or mention a different rating.\n"
@@ -229,8 +229,8 @@ class TaskATwoPassAgent:
         user_msg = (
             f"LOCKED RATING: {rating}/5.0 (do not change)\n"
             f"PASS-1 RATIONALE: {review_reasoning}\n\n"
-            f"USER PERSONA (you are this person — first person 'I'):\n{persona_text}\n\n"
-            f"PRODUCT DETAILS (what you used/visited — write about THIS):\n"
+            f"USER PERSONA (you are this person - first person 'I'):\n{persona_text}\n\n"
+            f"PRODUCT DETAILS (what you used/visited - write about THIS):\n"
             f"- {item_name}\n"
             f"- {item_context or '(none)'}\n\n"
             f"Bias tendency: {bias} | Language: {language}\n"
@@ -280,24 +280,24 @@ class TaskATwoPassAgent:
     ) -> str:
         templates = {
             "food": {
-                "high": "I enjoyed {item} — taste and portion were fair for the price, and I'd go again.",
+                "high": "I enjoyed {item} - taste and portion were fair for the price, and I'd go again.",
                 "mid": "Mixed feelings on {item}; decent taste but wait/price could be better.",
-                "low": "Wouldn't rush back to {item} — portion or value didn't match what I paid.",
+                "low": "Wouldn't rush back to {item} - portion or value didn't match what I paid.",
             },
             "tech": {
-                "high": "I've been using {item} and it's solid — fast, reliable, and worth the spend for me.",
+                "high": "I've been using {item} and it's solid - fast, reliable, and worth the spend for me.",
                 "mid": "{item} works, but a few rough edges on speed/support for the price.",
-                "low": "Disappointed with {item} — reliability and value aren't there yet for me.",
+                "low": "Disappointed with {item} - reliability and value aren't there yet for me.",
             },
             "service": {
-                "high": "{item} delivered well — responsive team and clear value for what I paid.",
+                "high": "{item} delivered well - responsive team and clear value for what I paid.",
                 "mid": "Okay experience with {item}; turnaround and communication were average.",
-                "low": "{item} fell short — slow response and not enough value for the cost.",
+                "low": "{item} fell short - slow response and not enough value for the cost.",
             },
             "book": {
-                "high": "{item} kept me engaged — pacing and writing style really worked for me.",
+                "high": "{item} kept me engaged - pacing and writing style really worked for me.",
                 "mid": "{item} was readable but not gripping throughout.",
-                "low": "Struggled to finish {item} — pacing didn't hold my attention.",
+                "low": "Struggled to finish {item} - pacing didn't hold my attention.",
             },
         }
         band = "high" if rating >= 4.0 else "mid" if rating >= 3.0 else "low"

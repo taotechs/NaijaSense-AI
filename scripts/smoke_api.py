@@ -61,7 +61,7 @@ def _smoke_hackathon_tasks(base_url: str) -> None:
                     "Lagos foodie, balanced tone, values honest reviews and fair prices."
                 ),
                 "product_details": (
-                    "Suya Stand — spicy skewers, fair price, quick service, slight queue at peak."
+                    "Suya Stand - spicy skewers, fair price, quick service, slight queue at peak."
                 ),
             },
         )
@@ -72,7 +72,7 @@ def _smoke_hackathon_tasks(base_url: str) -> None:
                 "user_persona": {
                     "user_id": "smoke_b",
                     "persona": (
-                        "Lagos weekend explorer on a moderate budget — enjoys buka food, "
+                        "Lagos weekend explorer on a moderate budget - enjoys buka food, "
                         "Nollywood movies, and casual drinks with friends."
                     ),
                 },
@@ -87,7 +87,7 @@ def _smoke_hackathon_tasks(base_url: str) -> None:
 
 def main(base_url: str) -> None:
     print("=" * 70)
-    print("HACKATHON — Task A & Task B endpoints")
+    print("HACKATHON - Task A & Task B endpoints")
     print("=" * 70)
     _smoke_hackathon_tasks(base_url)
 
@@ -100,7 +100,7 @@ def main(base_url: str) -> None:
     }
 
     print("=" * 70)
-    print("SCENARIO 1 — Specific review request fired 2x (sameness check)")
+    print("SCENARIO 1 - Specific review request fired 2x (sameness check)")
     print("=" * 70)
     review_body = {
         "user_persona": persona,
@@ -114,7 +114,7 @@ def main(base_url: str) -> None:
         _print_review(f"run {i + 1}", _post(base_url, review_body))
 
     print("=" * 70)
-    print("SCENARIO 2 — Recommendation request")
+    print("SCENARIO 2 - Recommendation request")
     print("=" * 70)
     rec_body = {
         "user_persona": persona,
@@ -124,7 +124,7 @@ def main(base_url: str) -> None:
     _print_recommend("recommend run", _post(base_url, rec_body))
 
     print("=" * 70)
-    print("SCENARIO 3 — Vague review (possible critique rewrite)")
+    print("SCENARIO 3 - Vague review (possible critique rewrite)")
     print("=" * 70)
     vague_body = {
         "user_persona": {

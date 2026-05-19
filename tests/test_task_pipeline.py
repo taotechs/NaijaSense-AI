@@ -59,6 +59,7 @@ def mock_rerank_from_candidate_blob(
     top_k: int,
     pool: object = None,
     team_culture_mode: bool = False,
+    advisory_only_mode: bool = False,
     **_: object,
 ) -> TaskBResponse:
     """Build a paragraph-style TaskBResponse from stage-1 candidate lines."""

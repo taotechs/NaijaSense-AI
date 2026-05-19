@@ -3,14 +3,14 @@
 Persists user feedback to a newline-delimited JSON log so we can post-hoc
 audit the agent's outputs and use the signal as fuel for the
 prompt-example bank / future fine-tuning. Storage is intentionally
-simple (file on local disk) to keep this hackathon-friendly — swap to
+simple (file on local disk) to keep this hackathon-friendly - swap to
 Postgres / S3 later without changing the API contract.
 
 Endpoints
 ~~~~~~~~~
-* ``POST /api/agent/feedback`` — append one feedback record. Returns the
+* ``POST /api/agent/feedback`` - append one feedback record. Returns the
   generated record id so the UI can show a "saved as #abc12" toast.
-* ``GET  /api/agent/feedback/stats`` — small aggregate (count, %
+* ``GET  /api/agent/feedback/stats`` - small aggregate (count, %
   positive) so a demo / pitch can show "we collected N samples in this
   session" without exposing individual records.
 """
@@ -34,7 +34,7 @@ router = APIRouter(tags=["feedback"])
 
 # Configurable via env (set FEEDBACK_LOG_PATH on the host) but defaults to
 # a path that exists inside the Docker image without needing a writable
-# volume — Koyeb's ephemeral disk is enough for hackathon-scale capture.
+# volume - Koyeb's ephemeral disk is enough for hackathon-scale capture.
 _DEFAULT_PATH = Path(os.environ.get("FEEDBACK_LOG_PATH", "data/feedback.jsonl"))
 _DEFAULT_PATH.parent.mkdir(parents=True, exist_ok=True)
 

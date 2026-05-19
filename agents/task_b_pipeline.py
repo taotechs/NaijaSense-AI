@@ -1,4 +1,4 @@
-"""Task B — diversified stage-1 retrieval + two-step LLM (rank → paragraph)."""
+"""Task B - diversified stage-1 retrieval + two-step LLM (rank → paragraph)."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ class TaskBPipelineAgent:
             interests = self._expand_cross_domain_interests(interests, parsed.narrative)
 
         retrieval_context = parsed.retrieval_context or parsed.narrative
-        if parsed.team_culture_mode:
+        if parsed.team_culture_mode or parsed.advisory_only_mode:
             cross_domain = True
 
         stage1_pool = self._stage1_retrieve(
@@ -71,7 +71,8 @@ class TaskBPipelineAgent:
             min_unique_domains=3 if cross_domain or len(parsed.domains) >= 2 else 2,
         )
 
-        want = min(k, len(diversified))
+        cap = 4 if parsed.advisory_only_mode else k
+        want = min(cap, len(diversified))
         recommendations_text, agent_reasoning = self._stage2_rerank(
             parsed=parsed,
             interests=interests,
@@ -80,6 +81,7 @@ class TaskBPipelineAgent:
             cold_start=parsed.cold_start,
             cross_domain=cross_domain,
             team_culture_mode=parsed.team_culture_mode,
+            advisory_only_mode=parsed.advisory_only_mode,
         )
 
         return {
@@ -105,6 +107,7 @@ class TaskBPipelineAgent:
             location=parsed.location,
             tone_notes="budget" if parsed.budget_sensitive else None,
             team_culture_mode=parsed.team_culture_mode,
+            advisory_only_mode=parsed.advisory_only_mode,
         )
 
     def _stage2_rerank(
@@ -117,6 +120,7 @@ class TaskBPipelineAgent:
         cold_start: bool,
         cross_domain: bool,
         team_culture_mode: bool = False,
+        advisory_only_mode: bool = False,
     ) -> Tuple[str, str]:
         persona_block = parsed.narrative.strip()[:4000]
         monologue_seed = self._build_persona_monologue(parsed, interests, cold_start, cross_domain)
@@ -134,6 +138,7 @@ class TaskBPipelineAgent:
             top_k=top_k,
             pool=pool,
             team_culture_mode=team_culture_mode,
+            advisory_only_mode=advisory_only_mode,
         )
 
         return _finalize_paragraph_response(result)
@@ -156,7 +161,7 @@ class TaskBPipelineAgent:
             lines.append(f"- Budget signal detected in persona: {naira.group(0)}")
         if parsed.budget_sensitive:
             lines.append(
-                "- Financial constraint: budget-sensitive — avoid premium-tier picks."
+                "- Financial constraint: budget-sensitive - avoid premium-tier picks."
             )
         else:
             lines.append("- Financial constraint: no strict budget cap detected from persona.")
@@ -170,8 +175,13 @@ class TaskBPipelineAgent:
             )
         if parsed.team_culture_mode:
             lines.append(
-                "- Team-culture mode: persona asks about hiring — recommend Lagos lifestyle perks "
+                "- Team-culture mode: persona asks about hiring - recommend Lagos lifestyle perks "
                 "(team meals, outings, experiences), not HR advice or a shopping list of gadgets."
+            )
+        if parsed.advisory_only_mode:
+            lines.append(
+                "- Advisory-only mode: persona is general advice (e.g. learning/career) - "
+                "recommend only study-friendly tech/books picks; do not answer the advice question."
             )
         return "\n".join(lines)
 

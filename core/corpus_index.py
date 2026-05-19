@@ -109,7 +109,7 @@ def _score_row(
 
 
 def _row_to_catalog_item(row: Dict[str, Any], idx: int) -> Optional[CatalogItem]:
-    """Task B only — returns None for review-placeholder rows."""
+    """Task B only - returns None for review-placeholder rows."""
     return resolve_display_item(row, idx=idx)
 
 
@@ -179,6 +179,7 @@ class LargeCorpusIndex:
         cold_start: bool = False,
         cross_domain: bool = False,
         team_culture_mode: bool = False,
+        advisory_only_mode: bool = False,
     ) -> List[Tuple[CatalogItem, float]]:
         """Stage-1 pool for Task B with persona constraint filtering."""
         tier = infer_price_tier_constraint(
@@ -189,6 +190,17 @@ class LargeCorpusIndex:
         )
         interest_terms = _terms(" ".join(interests))
         query_terms = interest_terms | _terms(context or "", location or "")
+
+        def _advisory_boost(item: CatalogItem, score: float) -> float:
+            dom = (item.domain or "").lower()
+            title_l = item.title.lower()
+            if dom in ("tech", "books", "services"):
+                score += 0.4
+            if any(k in title_l for k in ("book", "keyboard", "laptop", "course", "learn")):
+                score += 0.2
+            if dom == "food" and "jollof" not in (context or "").lower():
+                score -= 0.35
+            return score
 
         def _team_culture_boost(item: CatalogItem, score: float) -> float:
             dom = (item.domain or "").lower()
@@ -238,6 +250,8 @@ class LargeCorpusIndex:
                     adj += 0.1
                 if team_culture_mode:
                     adj = _team_culture_boost(item, adj)
+                if advisory_only_mode:
+                    adj = _advisory_boost(item, adj)
                 scored.append((item, round(adj, 4)))
 
             merged = merge_unique_items(scored, limit=limit)
@@ -390,11 +404,11 @@ def build_few_shot_matrix_block(examples: List[Dict[str, Any]]) -> str:
     if not examples:
         return (
             "FEW-SHOT PROFILE → REVIEW MATRIX (localized trade-offs: value-for-money, "
-            "wait time, durability — natural Nigerian syntax, not stereotypes):\n"
-            "(No corpus hits — using default priors.)\n"
+            "wait time, durability - natural Nigerian syntax, not stereotypes):\n"
+            "(No corpus hits - using default priors.)\n"
         )
     lines = [
-        "FEW-SHOT PROFILE → REVIEW MATRIX (retrieved from corpus — style only, do NOT copy facts):",
+        "FEW-SHOT PROFILE → REVIEW MATRIX (retrieved from corpus - style only, do NOT copy facts):",
         "",
         "| Profile cue | Sample review tone |",
         "|-------------|-------------------|",

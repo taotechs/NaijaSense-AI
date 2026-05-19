@@ -32,13 +32,10 @@ class Settings(BaseSettings):
     groq_generator_model: Optional[str] = None
     orchestrator_model: str = "gpt-4o-mini"
 
-    # Task B stage-2 rerank: groq (free tier, default) | gemini | auto
-    task_b_rerank_provider: str = "groq"
+    # Task B stage-2 rerank (Groq two-step; uses GROQ_API_KEY and router/generator models).
     task_b_top_k: int = 6
-    gemini_api_key: Optional[str] = None
-    task_b_gemini_model: str = "gemini-3-flash-preview"
 
-    # Generator sampling controls — surfaced so they can be tuned via .env
+    # Generator sampling controls - surfaced so they can be tuned via .env
     # without code changes. Larger penalties / top_p reduce repetition.
     gen_temperature: float = 0.85
     gen_top_p: float = 0.9
@@ -66,7 +63,11 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",  # e.g. legacy GEMINI_* / TASK_B_RERANK_PROVIDER in .env
+    )
 
 
 settings = Settings()

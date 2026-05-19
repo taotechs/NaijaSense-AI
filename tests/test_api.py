@@ -71,7 +71,7 @@ def test_agent_gateway_review_heuristic() -> None:
             "interests": ["food"],
             "sentiment_bias": "positive",
         },
-        "query": "Review Iya Amala — jollof was smoky and pepper balanced.",
+        "query": "Review Iya Amala - jollof was smoky and pepper balanced.",
         "top_k": 3,
     }
     response = client.post("/api/agent/v1", json=payload)
@@ -104,7 +104,7 @@ def test_task_a_user_modeling() -> None:
             "and honest Nigerian tone."
         ),
         "product_details": (
-            "Iya Eba Amala Spot — Saturday lunch, amala soft, egusi rich, about ₦2k each, 20 min wait."
+            "Iya Eba Amala Spot - Saturday lunch, amala soft, egusi rich, about ₦2k each, 20 min wait."
         ),
     }
     response = client.post("/task-a/user-modeling", json=payload)
@@ -121,7 +121,7 @@ def test_task_b_recommendation() -> None:
             "user_id": "hackathon_b",
             "persona": (
                 "Yaba student on a tight budget who loves cheap jollof, weekend Nollywood "
-                "with friends, and affordable smoothies — no premium spots."
+                "with friends, and affordable smoothies - no premium spots."
             ),
         },
     }

@@ -1,4 +1,4 @@
-"""Task B persona intent — avoid false tech/hiring matches and steer retrieval."""
+"""Task B persona intent - avoid false tech/hiring matches and steer retrieval."""
 
 from __future__ import annotations
 
@@ -55,6 +55,20 @@ _DOMAIN_HINTS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+_LIFESTYLE_SIGNAL_RE = re.compile(
+    r"\b(food|eat|eating|restaurant|buka|jollof|suya|amala|movie|nollywood|cinema|"
+    r"weekend|drink|bar|coffee|smoothie|hangout|dinner|lunch|brunch|date\s+night|"
+    r"student|budget|campus|₦|naira|yaba|ikeja|lekki|surulere)\b",
+    re.I,
+)
+
+_ADVISORY_ONLY_RE = re.compile(
+    r"\b(learn(?:ing)?|stud(?:y|ies)|course|career|advis(?:e|ed|able)|should\s+i|"
+    r"how\s+to|what\s+is|century|skill|artificial\s+intelligence|machine\s+learning|"
+    r"\bai\b|upskill|bootcamp|certification)\b",
+    re.I,
+)
+
 _TEAM_CULTURE_RE = re.compile(
     r"\b(hire|hiring|recruit|recruiting|join\s+(my|our)\s+team|"
     r"software\s+engineer|data\s+scientist|developer|founder|co-?founder|"
@@ -107,6 +121,7 @@ _COMPANY_NOISE_RE = re.compile(
 @dataclass(frozen=True)
 class PersonaIntent:
     team_culture_mode: bool = False
+    advisory_only_mode: bool = False
     domains: tuple[str, ...] = ()
     interests: tuple[str, ...] = ()
     retrieval_context: str = ""
@@ -123,8 +138,20 @@ def infer_persona_intent(narrative: str, *, base_domains: Sequence[str], base_in
             domains.append(domain)
 
     team_culture = bool(_TEAM_CULTURE_RE.search(lower))
+    has_lifestyle = bool(_LIFESTYLE_SIGNAL_RE.search(lower))
+    advisory_only = bool(_ADVISORY_ONLY_RE.search(lower)) and not has_lifestyle
 
-    if team_culture:
+    if advisory_only:
+        domains = [d for d in domains if d in ("tech", "books", "movies", "services")]
+        for d in ("tech", "books", "services"):
+            if d not in domains:
+                domains.append(d)
+        interests = list(
+            dict.fromkeys(
+                ["tech", "books", "student", "learning", "remote", "lagos", "budget"]
+            )
+        )
+    elif team_culture:
         # Hiring questions → team outings & local lifestyle, not Amazon HR gadgets.
         domains = [d for d in domains if d != "tech"]
         for d in ("experiences", "food", "entertainment", "drinks"):
@@ -175,6 +202,7 @@ def infer_persona_intent(narrative: str, *, base_domains: Sequence[str], base_in
 
     return PersonaIntent(
         team_culture_mode=team_culture,
+        advisory_only_mode=advisory_only,
         domains=tuple(domains),
         interests=tuple(interests),
         retrieval_context=ctx[:2000],

@@ -33,7 +33,7 @@ ROUTER_SYSTEM = """You route user messages for NaijaSense AI (Nigerian-flavored 
 - task=review: User wants a written review, rating, or feedback about ONE specific thing they tried or bought.
   Set item_name and item_context from the message. Keep item_name short (the product/place/experience).
 
-- task=recommend: User asks what to pick — food, watch, buy, gift ideas, "suggest", "what should I", planning, cold-start discovery.
+- task=recommend: User asks what to pick - food, watch, buy, gift ideas, "suggest", "what should I", planning, cold-start discovery.
   Fill candidate_items with 4–8 concrete, diverse short names. Include cross-domain ideas when it helps
   (e.g. after discussing books, a calming drink or café still fits).
 

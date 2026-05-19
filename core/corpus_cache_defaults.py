@@ -6,14 +6,14 @@ from typing import Any, Dict, List
 
 from core.candidate_catalog import CATALOG, CatalogItem
 
-# Task A — Nigerian few-shot style references (compact; no full corpus load).
+# Task A - Nigerian few-shot style references (compact; no full corpus load).
 DEFAULT_FEW_SHOT_REVIEWS: List[Dict[str, Any]] = [
     {
         "item_name": "Iya Eba Amala Spot",
         "item_domain": "food",
         "rating": 4.5,
         "text": (
-            "Paid about ₦2,500 for the plate — fair for the portion. Amala was soft, "
+            "Paid about ₦2,500 for the plate - fair for the portion. Amala was soft, "
             "egusi rich without being oily. Wait was 20 minutes on a Saturday; still worth it after class."
         ),
         "price_tier": "budget",
@@ -47,7 +47,7 @@ DEFAULT_FEW_SHOT_REVIEWS: List[Dict[str, Any]] = [
         "rating": 2.5,
         "text": (
             "Wrap had soggy bread and chicken was overcooked. For ₦3k I expected better "
-            "value — might try again only if I'm stuck on the Island late."
+            "value - might try again only if I'm stuck on the Island late."
         ),
         "price_tier": "mid",
         "tags": ["shawarma", "vi", "late-night"],

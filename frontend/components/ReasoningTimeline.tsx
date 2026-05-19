@@ -6,13 +6,13 @@
  * Renders the agent's reasoning as a visual timeline rather than a list of
  * bullet points. Two modes:
  *
- *   - "live"    — fed by the NDJSON stream from /api/agent/v1/stream;
+ *   - "live"    - fed by the NDJSON stream from /api/agent/v1/stream;
  *                 each ``step_start`` / ``step_end`` mutates the visible
  *                 list of nodes so the user watches the agent think.
- *   - "final"   — fed by ``result.reasoning_steps`` once the request has
+ *   - "final"   - fed by ``result.reasoning_steps`` once the request has
  *                 settled. Used to render the trace after the fact.
  *
- * The component is intentionally presentation-only — the parent owns
+ * The component is intentionally presentation-only - the parent owns
  * the state. This keeps it usable on the unified page (live) AND on
  * the existing "Agentic reasoning trace" disclosure (final).
  */

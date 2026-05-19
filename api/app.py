@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="NaijaSense AI",
     description=(
-        "DSN × BCT LLM Agent Challenge — Task A (user modeling) and Task B "
+        "DSN × BCT LLM Agent Challenge - Task A (user modeling) and Task B "
         "(recommendation) with dual submission endpoints."
     ),
     version="2.0.0",

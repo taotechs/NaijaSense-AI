@@ -66,9 +66,9 @@ const PRESETS: BehavioralPreset[] = [
 ];
 
 const EXAMPLE_PROMPTS: string[] = [
-  "Review the new Suya spot in Ikeja — went on Friday, queue was long but yaji on point.",
+  "Review the new Suya spot in Ikeja - went on Friday, queue was long but yaji on point.",
   "It's 11 PM on a Saturday; where is the best place to get freshly made Akara or noodles near Yaba?",
-  "Review of jollof rice from Iya Eba kitchen — soft amala, rich egusi, 20 min wait.",
+  "Review of jollof rice from Iya Eba kitchen - soft amala, rich egusi, 20 min wait.",
   "Suggest things to do in Abuja this weekend on a 10k budget.",
 ];
 
@@ -80,14 +80,14 @@ const LANGUAGE_OPTIONS: Array<{ value: AgentLanguage; label: string }> = [
 
 const SAFETY_FLAG_COPY: Record<string, string> = {
   prompt_injection_suspected: "Possible prompt-injection language in input.",
-  pii_email_in_input: "Email detected in input — consider redacting.",
-  pii_phone_in_input: "Phone number detected in input — consider redacting.",
-  pii_bvn_in_input: "BVN detected in input — REDACT before resubmitting.",
+  pii_email_in_input: "Email detected in input - consider redacting.",
+  pii_phone_in_input: "Phone number detected in input - consider redacting.",
+  pii_bvn_in_input: "BVN detected in input - REDACT before resubmitting.",
   pii_email_in_output: "Output contains an email-like token.",
   pii_phone_in_output: "Output contains a phone-like token.",
   pii_bvn_in_output: "Output contains a BVN-like token.",
   ungrounded_numeric_specifics:
-    "Output contains numeric facts not present in the input — verify before sharing.",
+    "Output contains numeric facts not present in the input - verify before sharing.",
   compare_variant_failed: "Comparison variant failed; main result is shown.",
 };
 
@@ -193,7 +193,7 @@ function ThumbsRow({
       >
         {"\u{1F44E}"} No
       </button>
-      {sent && <span className="text-slate-600">thanks — logged</span>}
+      {sent && <span className="text-slate-600">thanks - logged</span>}
       {error && <span className="text-rose-400">{error}</span>}
     </div>
   );

@@ -32,7 +32,7 @@ from utils.schemas import (
 )
 
 # Valid output-language tokens. We normalise unknown values to ``english``
-# rather than failing — the agent should always respond, even if the UI
+# rather than failing - the agent should always respond, even if the UI
 # sends an unsupported tag from a future build.
 _VALID_LANGUAGES = ("english", "pidgin", "yoruba_mix")
 

@@ -139,7 +139,7 @@ class ReviewGenerationAgent(BaseAgent):
 
         bias_rule = {
             "positive": (
-                "Overall sentiment is positive but specific — no gushing, no hyperbole."
+                "Overall sentiment is positive but specific - no gushing, no hyperbole."
             ),
             "balanced": (
                 "Overall sentiment is balanced: name one concrete strength AND one honest caveat."
@@ -158,10 +158,10 @@ class ReviewGenerationAgent(BaseAgent):
             "Write like a real buyer in Lagos, Abuja, or Port Harcourt: value-for-money "
             "matters, service speed and 'worth it' matter, and tone is direct but fair. "
             "Use natural Nigerian English (light pidgin or local adjectives only when "
-            "persona style allows — e.g. 'e dey sweet', 'no cap', 'worth the hype', "
+            "persona style allows - e.g. 'e dey sweet', 'no cap', 'worth the hype', "
             "'cash-wise'). You produce short, specific, human-sounding reviews grounded "
             "ONLY in the facts provided. Never invent prices, brands, or experiences not "
-            "in the facts. Return ONLY the review text — no preamble, headings, markdown, "
+            "in the facts. Return ONLY the review text - no preamble, headings, markdown, "
             "or quotation marks."
         )
 
@@ -230,7 +230,7 @@ class ReviewGenerationAgent(BaseAgent):
             "issues": critique.get("issues", []),
             "rewritten": False,
         }
-        # Gate on score only — the small critic's needs_rewrite boolean is
+        # Gate on score only - the small critic's needs_rewrite boolean is
         # noisy and biased toward "yes". Score is more reliable.
         score = critique.get("specificity_score")
         needs_rewrite = isinstance(score, int) and score < settings.review_critique_threshold
@@ -262,9 +262,9 @@ class ReviewGenerationAgent(BaseAgent):
         """Ask the critic model for a JSON verdict on the review."""
         system_msg = (
             "You are a calibrated review-quality critic. You score consumer reviews "
-            "for specificity. You are NOT a stylist or a perfectionist — your job is "
+            "for specificity. You are NOT a stylist or a perfectionist - your job is "
             "to flag genuinely vague or generic reviews, not to nitpick decent ones. "
-            "You output ONLY a single JSON object — no prose, no markdown, no code fences."
+            "You output ONLY a single JSON object - no prose, no markdown, no code fences."
         )
         user_msg = (
             "Score the following review on specificity using this rubric:\n"
@@ -277,7 +277,7 @@ class ReviewGenerationAgent(BaseAgent):
             "  2 = vague: generic adjectives only, could apply to any similar item.\n"
             "  1 = empty calories: zero substance.\n\n"
             "Be honest but not harsh. A 4 is the typical score for a normal good "
-            "review — do NOT reserve 4-5 for poetry. Only score 1-3 if the review "
+            "review - do NOT reserve 4-5 for poetry. Only score 1-3 if the review "
             "is genuinely lacking concrete detail.\n\n"
             f"Item being reviewed: {item_name}\n"
             f"Required persona style: {persona_style} "
@@ -359,7 +359,7 @@ class ReviewGenerationAgent(BaseAgent):
             "You are a Nigerian consumer-review writer for the NaijaSense AI platform. "
             "A previous draft was rejected by a quality critic. Write a DIFFERENT, "
             "more concrete review that fixes the listed issues. You return ONLY the "
-            "review text — no preamble, no headings, no markdown, no quotation marks."
+            "review text - no preamble, no headings, no markdown, no quotation marks."
         )
         user_msg = (
             "Rewrite this review so it is more specific and human, addressing the "
@@ -406,14 +406,14 @@ class ReviewGenerationAgent(BaseAgent):
     def _build_few_shot_block(retrieved_examples: List[Dict[str, Any]]) -> str:
         """Format up to three retrieved corpus rows as a style/concreteness reference.
 
-        Examples are shown for STYLE & concreteness only — the system prompt forbids
+        Examples are shown for STYLE & concreteness only - the system prompt forbids
         copying their facts. Snippets are truncated and stripped of newlines so the
         block stays compact.
         """
         if not retrieved_examples:
             return ""
         lines: List[str] = [
-            "FEW-SHOT EXAMPLES (style and concreteness reference — do NOT copy their facts):",
+            "FEW-SHOT EXAMPLES (style and concreteness reference - do NOT copy their facts):",
         ]
         shown = 0
         for ex in retrieved_examples[:3]:

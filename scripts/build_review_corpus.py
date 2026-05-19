@@ -152,7 +152,7 @@ def main() -> None:
     by_source: Dict[str, int] = {}
     for rec in records:
         by_source[rec.source] = by_source.get(rec.source, 0) + 1
-    print(f"Wrote {len(records)} normalized records to {output_path} — {by_source}")
+    print(f"Wrote {len(records)} normalized records to {output_path} - {by_source}")
 
 
 _PLACEHOLDER_NAMES = frozenset(
@@ -281,7 +281,7 @@ def _load_from_large_corpus(
         out.append(rec)
         per_source[source] = per_source.get(source, 0) + 1
 
-    print(f"Imported {len(out)} rows from {path} — {per_source}")
+    print(f"Imported {len(out)} rows from {path} - {per_source}")
     return out
 
 

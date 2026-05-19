@@ -1,4 +1,4 @@
-"""Hackathon submission schemas — Task A / Task B strict I/O."""
+"""Hackathon submission schemas - Task A / Task B strict I/O."""
 
 from typing import List, Optional
 
@@ -108,7 +108,7 @@ class TaskBRankedPick(BaseModel):
 
 
 class TaskBRankResponse(BaseModel):
-    """Internal: stage-2 pass A — ranked item_ids from stage-1 pool."""
+    """Internal: stage-2 pass A - ranked item_ids from stage-1 pool."""
 
     agent_reasoning: str
     rankings: List[TaskBRankedPick]

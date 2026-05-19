@@ -4,22 +4,22 @@ Headline question: *does the silent historical-context step actually move
 the needle?* This script gives a numeric answer by running the agent in
 both modes on a held-out slice of the review corpus and reporting
 
-* Rating error (MAE)     — how close the predicted rating is to truth
-* Text similarity (cos)  — TF-IDF cosine between generated & real review
-* Tone-match score        — does generated tone match the ground-truth tone?
-* Composite fidelity      — weighted blend, higher is better
+* Rating error (MAE)     - how close the predicted rating is to truth
+* Text similarity (cos)  - TF-IDF cosine between generated & real review
+* Tone-match score        - does generated tone match the ground-truth tone?
+* Composite fidelity      - weighted blend, higher is better
 
 For every user_id with >=2 entries we hold out the LAST review and treat
 the rest as the user's "past behaviour" already in the historical store.
 We then ask the agent to review the held-out item under two modes:
 
-  (a) ``include_history=True``  — full pipeline (default production path)
-  (b) ``include_history=False`` — silent retrieval skipped (control)
+  (a) ``include_history=True``  - full pipeline (default production path)
+  (b) ``include_history=False`` - silent retrieval skipped (control)
 
 Outputs
 ~~~~~~~
-* ``data/eval/fidelity_results.jsonl`` — per-item raw scores
-* ``data/eval/fidelity_summary.json``  — aggregate means + delta
+* ``data/eval/fidelity_results.jsonl`` - per-item raw scores
+* ``data/eval/fidelity_summary.json``  - aggregate means + delta
 
 Usage
 ~~~~~

@@ -31,7 +31,7 @@ def md_to_docx_bytes(md_text: str) -> bytes:
             "markdown.extensions.tables",
         ],
     )
-    return html2docx(html, "NaijaSense AI — Solution Paper").getvalue()
+    return html2docx(html, "NaijaSense AI - Solution Paper").getvalue()
 
 
 def write_docx(path: Path, data: bytes) -> None:
