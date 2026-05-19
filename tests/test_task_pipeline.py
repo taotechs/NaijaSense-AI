@@ -9,7 +9,7 @@ from agents.task_a_two_pass import TaskATwoPassAgent
 from agents.task_b_pipeline import TaskBPipelineAgent
 from core.candidate_catalog import retrieve_top_k
 from evals import run_mock_validation
-from utils.task_schemas import RecommendationItem, TaskBResponse
+from utils.task_schemas import TaskBResponse
 
 
 def test_retrieve_top_30() -> None:
@@ -44,27 +44,29 @@ def mock_rerank_from_candidate_blob(
     candidate_items_list: str,
     top_k: int,
 ) -> TaskBResponse:
-    """Build a TaskBResponse from the same candidate lines the pipeline sends to Gemini."""
-    items: list[RecommendationItem] = []
+    """Build a paragraph-style TaskBResponse from stage-1 candidate lines."""
+    titles: list[str] = []
     for line in candidate_items_list.strip().splitlines():
-        id_match = re.search(r"item_id=([^\s|]+)", line)
-        if not id_match:
-            continue
-        domain_match = re.search(r"domain=([^\s|]+)", line)
         title_match = re.search(r"title=([^|]+)", line)
-        items.append(
-            RecommendationItem(
-                item_id=id_match.group(1),
-                title=f"Great pick: {(title_match.group(1) if title_match else 'pick').strip()}",
-                domain=(domain_match.group(1) if domain_match else "general").strip(),
-                confidence_score=round(0.9 - 0.08 * len(items), 2),
-            )
-        )
-        if len(items) >= top_k:
+        if title_match:
+            titles.append(title_match.group(1).strip())
+        if len(titles) >= top_k:
             break
+
+    sentences = [
+        f"If you are watching your spend, {titles[0]} is a solid weekend pick for local flavour."
+        if titles
+        else "Start with a budget-friendly jollof spot near campus for reliable value.",
+    ]
+    for title in titles[1:top_k]:
+        sentences.append(
+            f"You might also enjoy {title}, which fits a student budget and social weekends."
+        )
+
+    paragraph = " ".join(sentences)
     return TaskBResponse(
         agent_reasoning="Persona-driven rerank: budget student prefers affordable food and movies.",
-        recommendations=items,
+        recommendations=paragraph,
     )
 
 
@@ -82,35 +84,32 @@ def test_task_b_pipeline_persona_only() -> None:
             top_k=3,
         )
 
-    assert len(out["recommendations"]) == 3
+    assert isinstance(out["recommendations"], str)
+    assert len(out["recommendations"]) >= 80
     assert out["agent_reasoning"]
-    assert out["recommendations"][0]["confidence_score"] >= 0.0
-    assert out["recommendations"][0]["title"].startswith("Great pick:")
+    assert "1." not in out["recommendations"][:20]
 
 
-def test_task_b_pipeline_rejects_invalid_gemini_item_id() -> None:
-    def _bad_rerank(**_kwargs: object) -> TaskBResponse:
+def test_task_b_pipeline_rejects_numbered_list() -> None:
+    def _numbered_rerank(**_kwargs: object) -> TaskBResponse:
         return TaskBResponse(
-            agent_reasoning="Test reasoning trace.",
-            recommendations=[
-                RecommendationItem(
-                    item_id="not_in_pool",
-                    title="Fake",
-                    domain="food",
-                    confidence_score=0.5,
-                )
-            ],
+            agent_reasoning="Test reasoning trace with enough detail for validation.",
+            recommendations=(
+                "1. First pick for your budget.\n"
+                "2. Second pick for weekend movies.\n"
+                "3. Third pick with extra padding text so the paragraph meets minimum length requirements."
+            ),
         )
 
-    with patch("agents.task_b_pipeline.rerank_with_gemini", side_effect=_bad_rerank):
+    with patch("agents.task_b_pipeline.rerank_with_gemini", side_effect=_numbered_rerank):
         agent = TaskBPipelineAgent()
         with pytest.raises(Exception) as exc_info:
             agent.run(
                 user_id="u1",
                 persona_narrative="Lagos foodie who loves jollof and suya on a budget in Yaba.",
-                top_k=1,
+                top_k=3,
             )
-        assert "not in stage-1 pool" in str(exc_info.value).lower()
+        assert "numbered list" in str(exc_info.value).lower()
 
 
 def test_evals_mock_validation() -> None:
