@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     # Task B stage-2 rerank: groq (free tier, default) | gemini | auto
     task_b_rerank_provider: str = "groq"
+    task_b_top_k: int = 6
     gemini_api_key: Optional[str] = None
     task_b_gemini_model: str = "gemini-3-flash-preview"
 

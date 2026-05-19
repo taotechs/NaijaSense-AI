@@ -8,8 +8,22 @@ import pytest
 from agents.task_a_two_pass import TaskATwoPassAgent
 from agents.task_b_pipeline import TaskBPipelineAgent
 from core.candidate_catalog import retrieve_top_k
+from core.task_b_diversify import diversify_stage1_pool
 from evals import run_mock_validation
 from utils.task_schemas import TaskBResponse
+
+
+def test_diversify_stage1_pool_spreads_domains() -> None:
+    pool = retrieve_top_k(interests=["food", "movies", "student"], context="yaba budget", limit=30)
+    diversified = diversify_stage1_pool(
+        pool,
+        limit=12,
+        persona_domains=["food", "movies", "entertainment"],
+        min_unique_domains=3,
+    )
+    domains = {(item.domain or "").lower() for item, _ in diversified}
+    assert len(diversified) <= 12
+    assert len(domains) >= 2
 
 
 def test_retrieve_top_30() -> None:

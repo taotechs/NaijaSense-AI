@@ -32,7 +32,7 @@ Use these **two separate URLs** in the DSN × BCT submission form:
 NaijaSense AI ships **two submission POST endpoints** (Task A & Task B) plus a **Behavioral Intelligence Hub** (`/unified`) for demos, streaming traces, and ablations.
 
 - **Task A (submission):** two-pass user modeling — Pass 1 locks a domain-aware star rating + rationale; Pass 2 writes first-person `review_text` aligned to that score (`TaskATwoPassAgent`).
-- **Task B (submission):** persona-only input — stage-1 corpus retrieval (top 30) then LLM **Reason-Before-Recommend** rerank with mandatory `agent_reasoning` (`TaskBPipelineAgent`).
+- **Task B (submission):** persona-only input — diversified stage-1 retrieval (top 30) then **two-step LLM**: router ranks `item_id`s → generator writes one grounded paragraph + `agent_reasoning` (`TaskBPipelineAgent`).
 - **Unified hub (demo):** intent router → orchestrator with silent history by `user_id`, critique→regenerate on reviews, and legacy deterministic ranking on `/api/v1/recommend` (benchmark path).
 
 The stack **separates a fast router model from a strong generator** (Groq Llama 3.1 8B + Llama 3.3 70B), grounds Task A in corpus few-shots/RAG, and documents both paths honestly in [`docs/SOLUTION_PAPER.md`](docs/SOLUTION_PAPER.md).
@@ -73,7 +73,7 @@ flowchart TB
     TB --> P2[parse_task_b_persona]
     P2 --> B1[TaskBPipelineAgent]
     B1 --> S1[Stage 1: top-30 catalog retrieval]
-    S1 --> S2[Stage 2: LLM Reason-Before-Recommend rerank]
+    S1 --> S2[Stage 2: router rank → generator paragraph]
     S2 --> R2[recommendation paragraph + agent_reasoning]
 ```
 
@@ -86,8 +86,8 @@ flowchart TB
 **Task B flow (`TaskBPipelineAgent`):**
 
 1. Parse `user_persona.persona` only (no separate query/context field).
-2. **Stage 1:** `retrieve_top_k` → up to 30 candidates (cold-start / cross-domain via `core/nigerian_defaults.py`).
-3. **Stage 2:** Groq (default, free tier) returns `agent_reasoning` plus one `recommendations` paragraph; optional Gemini when credits exist; local prose fallback if both fail.
+2. **Stage 1:** `retrieve_top_k` → up to 30 candidates, then `diversify_stage1_pool` for cross-domain spread (cold-start / cross-domain via `core/nigerian_defaults.py`).
+3. **Stage 2 (Groq default):** **Pass A** — router (`llama-3.1-8b-instant`) JSON-ranks top **6** `item_id`s with `agent_reasoning`; **Pass B** — generator (`llama-3.3-70b-versatile`) writes one paragraph mentioning locked titles (grounding retry). Optional Gemini one-shot; local prose fallback if LLMs fail.
 
 ### Unified hub (demo + benchmarks)
 

@@ -1,4 +1,4 @@
-"""Task B — stage-1 retrieval (top-30) + Gemini structured rerank (persona-only)."""
+"""Task B — diversified stage-1 retrieval + two-step LLM (rank → paragraph)."""
 
 from __future__ import annotations
 
@@ -9,9 +9,12 @@ from agents.task_b_errors import TaskBRerankError
 from agents.task_b_rerank import rerank_task_b
 from core.candidate_catalog import CatalogItem, retrieve_top_k
 from core.persona_parser import ParsedPersona, parse_task_b_persona
+from core.task_b_diversify import diversify_stage1_pool
+from utils.config import settings
 from utils.task_schemas import TaskBResponse
 
 _NUMBERED_LIST_RE = re.compile(r"(?m)^\s*\d+[\.\)]\s+")
+_NAIRA_RE = re.compile(r"₦\s*[\d,]+|(\d+)\s*k\b", re.I)
 
 ARCHETYPE_BRIDGES = {
     "social": ("entertainment", "experiences", "food", "movies"),
@@ -24,10 +27,12 @@ ARCHETYPE_BRIDGES = {
     "drink": ("drinks", "food", "entertainment"),
 }
 
-class TaskBPipelineAgent:
-    """Stage-1 corpus retrieval → Stage-2 LLM paragraph (Groq default, Gemini optional)."""
 
-    DEFAULT_TOP_K = 10
+class TaskBPipelineAgent:
+    """Stage-1 retrieval → router rank → generator paragraph (Groq by default)."""
+
+    DEFAULT_TOP_K = 6
+    STAGE1_LIMIT = 30
 
     def run(
         self,
@@ -37,7 +42,7 @@ class TaskBPipelineAgent:
         top_k: int | None = None,
     ) -> Dict[str, Any]:
         parsed = parse_task_b_persona(persona_narrative, user_id=user_id)
-        k = top_k or self.DEFAULT_TOP_K
+        k = top_k or getattr(settings, "task_b_top_k", None) or self.DEFAULT_TOP_K
         interests = list(parsed.interests)
         cross_domain = parsed.cold_start or len(set(parsed.domains)) >= 2
 
@@ -54,11 +59,18 @@ class TaskBPipelineAgent:
         if not stage1_pool:
             raise TaskBRerankError("Stage-1 retrieval returned no candidates.")
 
-        want = min(k, len(stage1_pool))
+        diversified = diversify_stage1_pool(
+            stage1_pool,
+            limit=self.STAGE1_LIMIT,
+            persona_domains=parsed.domains,
+            min_unique_domains=3 if cross_domain or len(parsed.domains) >= 2 else 2,
+        )
+
+        want = min(k, len(diversified))
         recommendations_text, agent_reasoning = self._stage2_rerank(
             parsed=parsed,
             interests=interests,
-            pool=stage1_pool,
+            pool=diversified,
             top_k=want,
             cold_start=parsed.cold_start,
             cross_domain=cross_domain,
@@ -80,11 +92,11 @@ class TaskBPipelineAgent:
         return retrieve_top_k(
             interests=interests,
             context=parsed.narrative,
-            limit=30,
+            limit=self.STAGE1_LIMIT,
             cold_start=cold_start,
             cross_domain=cross_domain,
             location=parsed.location,
-            tone_notes=None,
+            tone_notes="budget" if parsed.budget_sensitive else None,
         )
 
     def _stage2_rerank(
@@ -114,18 +126,7 @@ class TaskBPipelineAgent:
             pool=pool,
         )
 
-        paragraph = (result.recommendations or "").strip()
-        if len(paragraph) < 80:
-            raise TaskBRerankError("Recommendations paragraph too short.")
-        if _NUMBERED_LIST_RE.search(paragraph):
-            raise TaskBRerankError(
-                "Recommendations must be one fluid paragraph, not a numbered list."
-            )
-        reasoning = (result.agent_reasoning or "").strip()
-        if not reasoning:
-            raise TaskBRerankError("agent_reasoning is empty.")
-
-        return paragraph, reasoning
+        return _finalize_paragraph_response(result)
 
     @staticmethod
     def _build_persona_monologue(
@@ -140,9 +141,12 @@ class TaskBPipelineAgent:
             f"- Lifestyle / category signals: {', '.join(parsed.domains[:6]) or 'general'}",
             f"- Interest weights: {', '.join(interests[:8])}",
         ]
+        naira = _NAIRA_RE.search(parsed.narrative)
+        if naira:
+            lines.append(f"- Budget signal detected in persona: {naira.group(0)}")
         if parsed.budget_sensitive:
             lines.append(
-                "- Financial constraint: budget-sensitive persona — down-rank premium-tier items."
+                "- Financial constraint: budget-sensitive — avoid premium-tier picks."
             )
         else:
             lines.append("- Financial constraint: no strict budget cap detected from persona.")
@@ -152,7 +156,7 @@ class TaskBPipelineAgent:
             )
         if cross_domain:
             lines.append(
-                "- Cross-domain: bridging tastes (e.g. social food energy → movies/experiences)."
+                "- Cross-domain: spread recommendations across food, entertainment, and lifestyle."
             )
         return "\n".join(lines)
 
@@ -164,3 +168,17 @@ class TaskBPipelineAgent:
             if archetype in blob:
                 expanded.extend(domains)
         return list(dict.fromkeys(expanded))
+
+
+def _finalize_paragraph_response(result: TaskBResponse) -> Tuple[str, str]:
+    paragraph = (result.recommendations or "").strip()
+    if len(paragraph) < 80:
+        raise TaskBRerankError("Recommendations paragraph too short.")
+    if _NUMBERED_LIST_RE.search(paragraph):
+        raise TaskBRerankError(
+            "Recommendations must be one fluid paragraph, not a numbered list."
+        )
+    reasoning = (result.agent_reasoning or "").strip()
+    if not reasoning:
+        raise TaskBRerankError("agent_reasoning is empty.")
+    return paragraph, reasoning

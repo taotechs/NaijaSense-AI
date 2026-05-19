@@ -100,6 +100,20 @@ class RecommendationItem(BaseModel):
     confidence_score: float = Field(..., ge=0.0, le=1.0)
 
 
+class TaskBRankedPick(BaseModel):
+    """Internal: router step output for Task B (not exposed on hackathon API)."""
+
+    item_id: str
+    brief_why: str = Field(default="", max_length=200)
+
+
+class TaskBRankResponse(BaseModel):
+    """Internal: stage-2 pass A — ranked item_ids from stage-1 pool."""
+
+    agent_reasoning: str
+    rankings: List[TaskBRankedPick]
+
+
 class TaskBResponse(BaseModel):
     recommendations: str = Field(
         ...,
