@@ -1,4 +1,4 @@
-"""Root landing page — dual submission links for judges."""
+"""Root landing page — dual submission task links."""
 
 from __future__ import annotations
 
@@ -39,13 +39,13 @@ def _landing_html(*, api_base: str = "") -> str:
 <body>
   <p class="tag">TAOTECH SOLUTIONS · NaijaSense AI</p>
   <h1>Dual-Link API Submission</h1>
-  <p>Two containerized task endpoints for the hackathon judges. Use the links below in the submission form.</p>
+  <p>Two containerized task endpoints for the competition. Use the API URLs below as your agent links.</p>
 
   <div class="card">
     <h2>Task A — User modeling</h2>
     <p><strong>API (POST):</strong> <a href="{task_a_api}">{task_a_api}</a></p>
     <p><strong>Demo UI:</strong> <a href="{task_a_ui}">{task_a_ui}</a></p>
-    <p>Input: <code>user_persona</code> + <code>product_details</code> · Output: <code>rating</code> + <code>review_text</code></p>
+    <p>Input: <code>user_persona</code> + <code>product_details</code> · Output: <code>rating</code>, <code>review_reasoning</code>, <code>review_text</code></p>
   </div>
 
   <div class="card">
