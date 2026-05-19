@@ -12,11 +12,13 @@ from utils.task_schemas import TaskBResponse
 
 _SYSTEM_INSTRUCTION = (
     "You are an advanced agentic recommendation engine for Nigerian lifestyle contexts. "
-    "Execute your reasoning trace first, storing it in 'agent_reasoning'. Then, rank exactly "
-    "{top_k} items from the Filtered Database Candidates list (best-first). "
-    "Each recommendation must use an item_id copied exactly from that list — do not invent ids. "
-    "You may rewrite title and domain into compelling, human-readable copy tailored to the persona; "
-    "confidence_score must reflect fit (0.0–1.0). "
+    "Execute your reasoning trace first, storing it in 'agent_reasoning'. "
+    "Then write the 'recommendations' field as ONE fluid paragraph only: exactly {top_k} "
+    "woven recommendation sentences in natural prose (no numbered list, no bullet points, "
+    "no markdown). Each sentence should name a specific pick from the Filtered Database "
+    "Candidates using compelling human-readable titles and categories — never raw item_id "
+    "strings or database indices. Tie every sentence to the persona's budget, location, "
+    "and lifestyle. Select only items from the candidate list; do not invent venues. "
     "There is no separate search query — infer needs only from the User Profile Persona."
 )
 
