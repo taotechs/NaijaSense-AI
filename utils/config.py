@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     groq_generator_model: Optional[str] = None
     orchestrator_model: str = "gpt-4o-mini"
 
+    # Task B stage-2 rerank (google-genai; GEMINI_API_KEY)
+    gemini_api_key: Optional[str] = None
+    task_b_gemini_model: str = "gemini-3-flash-preview"
+
     # Generator sampling controls — surfaced so they can be tuned via .env
     # without code changes. Larger penalties / top_p reduce repetition.
     gen_temperature: float = 0.85
