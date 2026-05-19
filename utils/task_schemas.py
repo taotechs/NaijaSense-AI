@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class UserPersona(BaseModel):
-    """User persona for both tasks (minimal, judge-friendly)."""
+    """User persona for legacy/unified routes (structured fields)."""
 
     user_id: str = Field(..., min_length=1, description="Unique user identifier.")
     location: Optional[str] = Field(default="Lagos, Nigeria")
@@ -102,5 +102,5 @@ class TaskBResponse(BaseModel):
     recommendations: List[RecommendationItem]
     agent_reasoning: str = Field(
         ...,
-        description="Mandatory Reason-Before-Recommend internal monologue for judges.",
+        description="Mandatory Reason-Before-Recommend internal monologue (explainability).",
     )
