@@ -9,7 +9,7 @@ Use these **two separate URLs** in the DSN × BCT submission form:
 | Task | Method | Endpoint | Input | Output |
 |------|--------|----------|-------|--------|
 | **Task A — User modeling** | `POST` | `/task-a/user-modeling` | `user_persona` + `product_details` (strings) | `rating`, `review_reasoning`, `review_text` |
-| **Task B — Recommendation** | `POST` | `/task-b/recommendation` | `user_persona`: `{ user_id, persona }` only | `recommendations[]` + `agent_reasoning` |
+| **Task B — Recommendation** | `POST` | `/task-b/recommendation` | `user_persona`: `{ user_id, persona }` only | `recommendations` (paragraph) + `agent_reasoning` |
 
 **Live submission URLs** (Vercel proxies POST to Koyeb — redeploy both tiers after pulling latest `main`).
 
@@ -74,7 +74,7 @@ flowchart TB
     P2 --> B1[TaskBPipelineAgent]
     B1 --> S1[Stage 1: top-30 catalog retrieval]
     S1 --> S2[Stage 2: LLM Reason-Before-Recommend rerank]
-    S2 --> R2[recommendations + agent_reasoning]
+    S2 --> R2[recommendation paragraph + agent_reasoning]
 ```
 
 **Task A flow (`TaskATwoPassAgent`):**
@@ -87,7 +87,7 @@ flowchart TB
 
 1. Parse `user_persona.persona` only (no separate query/context field).
 2. **Stage 1:** `retrieve_top_k` → up to 30 candidates (cold-start / cross-domain via `core/nigerian_defaults.py`).
-3. **Stage 2:** router LLM returns `agent_reasoning` + ranked `item_id` / `confidence_score` list; stage-1 scores used as fallback if JSON parse fails.
+3. **Stage 2:** Gemini returns `agent_reasoning` plus a single `recommendations` paragraph (flowing prose, no numbered list).
 
 ### Unified hub (demo + benchmarks)
 
