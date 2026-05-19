@@ -4,7 +4,7 @@ Hackathon evaluation utilities (Task A & Task B KPIs).
 Task A: RMSE (rating), ROUGE, BERTScore (or token-F1 fallback).
 Task B: NDCG@10, Hit Rate@10.
 
-Includes mock validation datasets for judge reproducibility runs.
+Includes mock validation datasets for reproducibility runs.
 """
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ def check_corpus_loader() -> Dict[str, object]:
 
 
 def run_mock_validation() -> Dict[str, object]:
-    """Execute mock datasets; safe for judges running ``python evals.py``."""
+    """Execute mock datasets; safe for ``python evals.py`` smoke validation."""
     task_a = score_task_a_batch(
         MOCK_TASK_A["predicted_reviews"],
         MOCK_TASK_A["reference_reviews"],
