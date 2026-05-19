@@ -20,7 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from core.data_loader import iter_jsonl
+from core.data_loader import iter_corpus_rows
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
@@ -126,7 +126,11 @@ def build_index(corpus_path: Path, index_path: Path, *, max_rows: int = 12_000) 
     rows: List[Dict[str, Any]] = []
     postings: Dict[str, List[int]] = {}
 
-    for idx, row in enumerate(iter_jsonl(corpus_path, max_rows=max_rows)):
+    count = 0
+    for idx, row in enumerate(iter_corpus_rows(corpus_path)):
+        if count >= max_rows:
+            break
+        count += 1
         compact = {
             "item_id": row.get("item_id"),
             "item_name": row.get("item_name"),

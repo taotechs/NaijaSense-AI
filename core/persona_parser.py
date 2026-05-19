@@ -7,17 +7,7 @@ from dataclasses import dataclass, field
 from typing import List, Set
 
 from core.nigerian_defaults import apply_cold_start_interests
-
-_DOMAIN_HINTS = {
-    "food": ("food", "restaurant", "jollof", "suya", "buka", "eat", "dining", "amala"),
-    "movies": ("movie", "nollywood", "film", "cinema", "watch", "series", "entertainment"),
-    "drinks": ("drink", "smoothie", "bar", "tea", "coffee", "juice", "cocktail"),
-    "tech": ("tech", "gadget", "phone", "laptop", "power bank", "earbuds"),
-    "wellness": ("wellness", "spa", "yoga", "fitness", "relax"),
-    "fashion": ("fashion", "ankara", "thrift", "style", "shopping"),
-    "books": ("book", "read", "literature", "novel"),
-    "experiences": ("weekend", "experience", "outing", "market", "social"),
-}
+from core.task_b_persona_intent import infer_persona_intent
 
 _LOCATION_RE = re.compile(
     r"\b(lagos|yaba|ikeja|vi|victoria island|abuja|port harcourt|ph|lekki|surulere|mainland)\b",
@@ -33,6 +23,8 @@ class ParsedPersona:
     domains: List[str] = field(default_factory=list)
     budget_sensitive: bool = False
     cold_start: bool = False
+    team_culture_mode: bool = False
+    retrieval_context: str = ""
 
 
 def parse_task_b_persona(persona_text: str, *, user_id: str = "") -> ParsedPersona:
@@ -47,25 +39,9 @@ def parse_task_b_persona(persona_text: str, *, user_id: str = "") -> ParsedPerso
         if "vi" in location.lower():
             location = "Victoria Island, Lagos"
 
-    domains: List[str] = []
-    for domain, hints in _DOMAIN_HINTS.items():
-        if any(h in lower for h in hints):
-            domains.append(domain)
-
-    interests: Set[str] = set(domains)
-    for token in re.findall(r"[a-z]{3,}", lower):
-        if token in (
-            "student",
-            "budget",
-            "street",
-            "social",
-            "spicy",
-            "tech",
-            "movies",
-            "food",
-            "drinks",
-        ):
-            interests.add(token)
+    intent = infer_persona_intent(narrative, base_domains=[], base_interests=[])
+    domains = list(intent.domains)
+    interests: Set[str] = set(intent.interests)
 
     if "value" in lower or "money" in lower:
         interests.add("value for money")
@@ -101,4 +77,6 @@ def parse_task_b_persona(persona_text: str, *, user_id: str = "") -> ParsedPerso
         domains=domains or interest_list[:4],
         budget_sensitive=budget_sensitive,
         cold_start=cold_start,
+        team_culture_mode=intent.team_culture_mode,
+        retrieval_context=intent.retrieval_context,
     )

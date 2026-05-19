@@ -104,13 +104,19 @@ def iter_corpus_rows(
 
     if suffix == ".json":
         # Prefer JSONL for large corpora; only load small array files whole-cloth.
-        if resolved.stat().st_size > 20_000_000:
+        if resolved.stat().st_size > 50_000_000:
             return iter(())
         data = json.loads(resolved.read_text(encoding="utf-8"))
+        rows: List[Any]
         if isinstance(data, list):
-            for row in data:
-                if isinstance(row, dict):
-                    yield row
+            rows = data
+        elif isinstance(data, dict) and isinstance(data.get("records"), list):
+            rows = data["records"]
+        else:
+            return
+        for row in rows:
+            if isinstance(row, dict):
+                yield row
         return
 
     if suffix == ".parquet":

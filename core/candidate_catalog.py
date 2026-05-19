@@ -52,6 +52,18 @@ CATALOG: tuple[CatalogItem, ...] = (
     CatalogItem("ent_stream", "Local streaming bundle + movie night kit", "entertainment", ("netflix", "home", "movie")),
     CatalogItem("exp_night_market", "Evening market stroll + street food", "experiences", ("market", "street", "social")),
     CatalogItem("food_delivery", "Jollof delivery under 3k — Yaba", "food", ("delivery", "budget", "quick")),
+    CatalogItem(
+        "exp_team_lunch",
+        "Founder team lunch — grilled catfish & plantain (VI)",
+        "experiences",
+        ("team", "founder", "social", "food"),
+    ),
+    CatalogItem(
+        "ent_team_comedy",
+        "Team night out — stand-up comedy (mainland)",
+        "entertainment",
+        ("team", "founder", "social", "comedy"),
+    ),
 )
 
 
@@ -68,6 +80,7 @@ def retrieve_top_k(
     cross_domain: bool = False,
     location: str | None = None,
     tone_notes: str | None = None,
+    team_culture_mode: bool = False,
 ) -> List[tuple[CatalogItem, float]]:
     """
     Stage-1 retrieval: scan large corpus (10k+) when available, else static catalog.
@@ -85,6 +98,7 @@ def retrieve_top_k(
             limit=limit,
             cold_start=cold_start,
             cross_domain=cross_domain,
+            team_culture_mode=team_culture_mode,
         )
         if pool:
             return pool

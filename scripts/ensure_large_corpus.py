@@ -21,6 +21,8 @@ from utils.config import settings
 def count_jsonl_lines(path: Path, *, stop_at: int | None = None) -> int:
     if not path.exists():
         return 0
+    if path.suffix.lower() == ".json":
+        return _count_json_records(path, stop_at=stop_at)
     count = 0
     with path.open("rb") as handle:
         for line in handle:
@@ -31,6 +33,24 @@ def count_jsonl_lines(path: Path, *, stop_at: int | None = None) -> int:
     return count
 
 
+def _count_json_records(path: Path, *, stop_at: int | None = None) -> int:
+    import json
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return 0
+    if isinstance(data, list):
+        n = len(data)
+    elif isinstance(data, dict) and isinstance(data.get("records"), list):
+        n = len(data["records"])
+    else:
+        return 0
+    if stop_at is not None:
+        return min(n, stop_at) if n >= stop_at else n
+    return n
+
+
 def corpus_is_ready(
     *,
     corpus_path: Path | None = None,
@@ -39,7 +59,7 @@ def corpus_is_ready(
 ) -> bool:
     corpus_path = corpus_path or Path(settings.large_corpus_path)
     index_path = index_path or Path(settings.corpus_index_path)
-    min_rows = min_rows if min_rows is not None else int(os.getenv("CORPUS_MIN_ROWS", "9000"))
+    min_rows = min_rows if min_rows is not None else int(os.getenv("CORPUS_MIN_ROWS", "2500"))
 
     if not corpus_path.exists() or not index_path.exists():
         return False

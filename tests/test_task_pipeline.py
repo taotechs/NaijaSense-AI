@@ -58,6 +58,8 @@ def mock_rerank_from_candidate_blob(
     candidate_items_list: str,
     top_k: int,
     pool: object = None,
+    team_culture_mode: bool = False,
+    **_: object,
 ) -> TaskBResponse:
     """Build a paragraph-style TaskBResponse from stage-1 candidate lines."""
     titles: list[str] = []

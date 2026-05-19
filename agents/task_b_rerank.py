@@ -38,10 +38,24 @@ _ROUTER_SYSTEM = (
 _GENERATOR_SYSTEM = (
     "You are a Nigerian lifestyle recommendation writer. Write ONE fluid paragraph only "
     "({sentence_count} sentences woven together). Rules: no numbered list, no bullets, no "
-    "markdown; vary sentence openings; mention each locked pick by its human-readable title; "
-    "tie choices to budget/location from the persona; light Nigerian English is fine. "
+    "markdown; vary sentence openings; mention each locked pick once by its human-readable "
+    "title; tie choices to budget/location from the persona; light Nigerian English is fine. "
+    "Do NOT repeat the same phrase (e.g. 'attract talent', 'top data scientists') more than "
+    "once. Do not give HR or recruiting advice — only concrete local picks. "
     "Return ONLY the paragraph text — no JSON, no headings.\n\n"
     + _GENERATOR_FEW_SHOT
+)
+
+_TEAM_CULTURE_ROUTER_EXTRA = (
+    " The persona is about hiring or building a team. Rank team-friendly lifestyle picks "
+    "(food outings, experiences, social venues). At most ONE tech accessory if any; avoid "
+    "random Amazon gadget SKUs as a hiring strategy."
+)
+
+_TEAM_CULTURE_GENERATOR_EXTRA = (
+    " The user mentioned hiring or founding a company. You are NOT an HR consultant. "
+    "Frame each pick as a welcome perk or team hangout in Lagos (meals, outings, culture) — "
+    "never as 'buy this to attract engineers'. Mention the company name at most once."
 )
 
 
@@ -51,6 +65,7 @@ def rerank_task_b(
     candidate_items_list: str,
     top_k: int,
     pool: List[Tuple[CatalogItem, float]],
+    team_culture_mode: bool = False,
 ) -> TaskBResponse:
     """Rank with router, write paragraph with generator; Gemini/fallback if Groq fails."""
     mode = (settings.task_b_rerank_provider or "groq").lower().strip()
@@ -63,6 +78,7 @@ def rerank_task_b(
                 candidate_items_list=candidate_items_list,
                 top_k=top_k,
                 pool=pool,
+                team_culture_mode=team_culture_mode,
             )
         except Exception as exc:
             errors.append(f"Groq two-step: {exc}")
@@ -92,19 +108,23 @@ def _two_step_groq(
     candidate_items_list: str,
     top_k: int,
     pool: List[Tuple[CatalogItem, float]],
+    team_culture_mode: bool = False,
 ) -> TaskBResponse:
     rank = _router_rank(
         user_persona=user_persona,
         candidate_items_list=candidate_items_list,
         top_k=top_k,
         pool=pool,
+        team_culture_mode=team_culture_mode,
     )
     locked = _resolve_locked_picks(rank, pool, top_k=top_k)
     paragraph = _generator_paragraph(
         user_persona=user_persona,
         locked_picks=locked,
         top_k=top_k,
+        team_culture_mode=team_culture_mode,
     )
+    paragraph = _polish_paragraph(paragraph)
     return TaskBResponse(agent_reasoning=rank.agent_reasoning.strip(), recommendations=paragraph)
 
 
@@ -114,6 +134,7 @@ def _router_rank(
     candidate_items_list: str,
     top_k: int,
     pool: List[Tuple[CatalogItem, float]],
+    team_culture_mode: bool = False,
 ) -> TaskBRankResponse:
     llm = LLMWrapper(role="router")
     user_msg = (
@@ -121,9 +142,12 @@ def _router_rank(
         f"Filtered Database Candidates:\n{candidate_items_list}\n\n"
         f"Rank exactly {top_k} item_id values. Return JSON only."
     )
+    system = _ROUTER_SYSTEM.format(top_k=top_k)
+    if team_culture_mode:
+        system += _TEAM_CULTURE_ROUTER_EXTRA
     raw = llm.generate(
         user_msg,
-        system=_ROUTER_SYSTEM.format(top_k=top_k),
+        system=system,
         temperature=0.2,
         max_tokens=700,
     ).text.strip()
@@ -188,6 +212,7 @@ def _generator_paragraph(
     user_persona: str,
     locked_picks: List[CatalogItem],
     top_k: int,
+    team_culture_mode: bool = False,
 ) -> str:
     if not locked_picks:
         raise TaskBRerankError("No locked picks for paragraph generation.")
@@ -203,6 +228,8 @@ def _generator_paragraph(
         "Write the recommendation paragraph now."
     )
     system = _GENERATOR_SYSTEM.format(sentence_count=sentence_count)
+    if team_culture_mode:
+        system += _TEAM_CULTURE_GENERATOR_EXTRA
 
     for attempt in range(2):
         raw = llm.generate(
@@ -238,6 +265,27 @@ def _paragraph_mentions_picks(
         if title[:12] in lower:
             hits += 1
     return hits >= min_hits
+
+
+def _polish_paragraph(text: str) -> str:
+    """Trim repetitive boilerplate common in founder/hiring personas."""
+    out = text
+    for phrase in (
+        "to attract top tech talent",
+        "to attract top data scientists",
+        "to attract and retain top talent",
+        "attract top data scientists",
+        "attract top tech talent",
+        "in the competitive field of data science",
+    ):
+        while phrase.lower() in out.lower():
+            idx = out.lower().find(phrase.lower())
+            out = (out[:idx] + out[idx + len(phrase) :]).strip()
+            out = re.sub(r"\s{2,}", " ", out)
+            out = re.sub(r"\s+([,.])", r"\1", out)
+    out = re.sub(r"\b(which is why|meanwhile,|by offering)\b", "", out, flags=re.I)
+    out = re.sub(r"\s{2,}", " ", out).strip()
+    return out
 
 
 def _clean_paragraph(raw: str) -> str:

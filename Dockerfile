@@ -14,8 +14,8 @@ RUN python -m pip install --no-cache-dir --upgrade pip && \
 
 COPY . .
 
-# Bake 10k-row evaluation corpus + inverted index into the image (seed: review_corpus.jsonl).
-RUN python scripts/ensure_large_corpus.py
+# Bake 3k-row structured corpus + inverted index into the image.
+RUN python scripts/generate_corpus.py --build-index
 
 RUN chmod +x scripts/docker-entrypoint.sh
 

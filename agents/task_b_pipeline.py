@@ -49,11 +49,16 @@ class TaskBPipelineAgent:
         if cross_domain:
             interests = self._expand_cross_domain_interests(interests, parsed.narrative)
 
+        retrieval_context = parsed.retrieval_context or parsed.narrative
+        if parsed.team_culture_mode:
+            cross_domain = True
+
         stage1_pool = self._stage1_retrieve(
             parsed=parsed,
             interests=interests,
             cold_start=parsed.cold_start,
             cross_domain=cross_domain,
+            context=retrieval_context,
         )
 
         if not stage1_pool:
@@ -74,6 +79,7 @@ class TaskBPipelineAgent:
             top_k=want,
             cold_start=parsed.cold_start,
             cross_domain=cross_domain,
+            team_culture_mode=parsed.team_culture_mode,
         )
 
         return {
@@ -88,15 +94,17 @@ class TaskBPipelineAgent:
         interests: List[str],
         cold_start: bool,
         cross_domain: bool,
+        context: str | None = None,
     ) -> List[Tuple[CatalogItem, float]]:
         return retrieve_top_k(
             interests=interests,
-            context=parsed.narrative,
+            context=context or parsed.narrative,
             limit=self.STAGE1_LIMIT,
             cold_start=cold_start,
             cross_domain=cross_domain,
             location=parsed.location,
             tone_notes="budget" if parsed.budget_sensitive else None,
+            team_culture_mode=parsed.team_culture_mode,
         )
 
     def _stage2_rerank(
@@ -108,6 +116,7 @@ class TaskBPipelineAgent:
         top_k: int,
         cold_start: bool,
         cross_domain: bool,
+        team_culture_mode: bool = False,
     ) -> Tuple[str, str]:
         persona_block = parsed.narrative.strip()[:4000]
         monologue_seed = self._build_persona_monologue(parsed, interests, cold_start, cross_domain)
@@ -124,6 +133,7 @@ class TaskBPipelineAgent:
             candidate_items_list=candidate_items_list,
             top_k=top_k,
             pool=pool,
+            team_culture_mode=team_culture_mode,
         )
 
         return _finalize_paragraph_response(result)
@@ -157,6 +167,11 @@ class TaskBPipelineAgent:
         if cross_domain:
             lines.append(
                 "- Cross-domain: spread recommendations across food, entertainment, and lifestyle."
+            )
+        if parsed.team_culture_mode:
+            lines.append(
+                "- Team-culture mode: persona asks about hiring — recommend Lagos lifestyle perks "
+                "(team meals, outings, experiences), not HR advice or a shopping list of gadgets."
             )
         return "\n".join(lines)
 

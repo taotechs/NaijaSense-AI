@@ -22,12 +22,34 @@ from data_pipeline.schema import NormalizedReviewRecord
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build normalized review corpus JSONL.")
     parser.add_argument("--output", default="data/processed/review_corpus.jsonl")
-    parser.add_argument("--limit", type=int, default=500, help="Rows per source (best effort).")
+    parser.add_argument("--limit", type=int, default=2500, help="Rows per HF/Kaggle source (best effort).")
+    parser.add_argument(
+        "--keep-existing",
+        action="store_true",
+        help="Merge rows already in --output before writing (deduped).",
+    )
     parser.add_argument("--use_hf", action="store_true", help="Pull datasets from HuggingFace hub.")
     parser.add_argument(
         "--hf_sources",
         default="yelp,amazon",
         help="When using --use_hf: comma-separated subset of yelp, amazon (skips large Yelp download if you pass amazon only).",
+    )
+    parser.add_argument(
+        "--offline-only",
+        action="store_true",
+        help="Skip HuggingFace/Kaggle (use when HF parquet downloads time out).",
+    )
+    parser.add_argument(
+        "--from-large-corpus",
+        default=None,
+        metavar="PATH",
+        help="Import rows from data/large_corpus.json (from scripts/generate_corpus.py).",
+    )
+    parser.add_argument(
+        "--large-corpus-per-source",
+        type=int,
+        default=400,
+        help="Max rows per source when using --from-large-corpus.",
     )
     parser.add_argument(
         "--extra_jsonl",
@@ -73,19 +95,30 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.offline_only and (args.use_hf or args.use_kaggle):
+        raise SystemExit("--offline-only cannot be combined with --use_hf or --use_kaggle.")
+
     records: List[NormalizedReviewRecord] = []
     for path_str in args.extra_jsonl or []:
         records.extend(_load_extra_jsonl(Path(path_str)))
 
+    if args.from_large_corpus:
+        records.extend(
+            _load_from_large_corpus(
+                Path(args.from_large_corpus),
+                max_per_source=args.large_corpus_per_source,
+            )
+        )
+
     hf_keys = {s.strip().lower() for s in args.hf_sources.split(",") if s.strip()} & {"yelp", "amazon"}
-    if args.use_hf:
+    if args.use_hf and not args.offline_only:
         if not hf_keys:
             print("No valid --hf_sources (use yelp and/or amazon); skipping HuggingFace ingest.")
         else:
             records.extend(_fetch_hf_records(limit=args.limit, hf_sources=hf_keys))
 
     kg_keys = {s.strip().lower() for s in args.kaggle_sources.split(",") if s.strip()} & {"amazon", "yelp"}
-    if args.use_kaggle:
+    if args.use_kaggle and not args.offline_only:
         if not kg_keys:
             print("No valid --kaggle_sources (use amazon and/or yelp); skipping Kaggle ingest.")
         else:
@@ -106,12 +139,150 @@ def main() -> None:
     records.extend(_local_seed_records())
 
     output_path = Path(args.output)
+    if args.keep_existing and output_path.is_file():
+        records = _dedupe_records(records + _load_extra_jsonl(output_path))
+
+    records = _dedupe_records([_polish_record(r) for r in records if (r.text or "").strip()])
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as handle:
         for rec in records:
             handle.write(json.dumps(rec.model_dump(), ensure_ascii=False) + "\n")
 
-    print(f"Wrote {len(records)} normalized records to {output_path}")
+    by_source: Dict[str, int] = {}
+    for rec in records:
+        by_source[rec.source] = by_source.get(rec.source, 0) + 1
+    print(f"Wrote {len(records)} normalized records to {output_path} — {by_source}")
+
+
+_PLACEHOLDER_NAMES = frozenset(
+    {"yelp_review", "amazon_review", "amazon_item", "goodreads_book", "yelp_item", "item"}
+)
+_GENERIC_AMAZON_TITLES = frozenset(
+    {
+        "amazing!",
+        "amazing",
+        "great!",
+        "great product",
+        "love it",
+        "love it!",
+        "good",
+        "bad",
+        "ok",
+        "nice",
+        "perfect",
+        "five stars",
+        "don't buy",
+        "terrible",
+    }
+)
+
+
+def _dedupe_records(records: List[NormalizedReviewRecord]) -> List[NormalizedReviewRecord]:
+    seen: set[str] = set()
+    out: List[NormalizedReviewRecord] = []
+    for rec in records:
+        key = f"{rec.source}|{rec.item_id}|{rec.item_name.strip().lower()}|{rec.text.strip()[:160]}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(rec)
+    return out
+
+
+def _infer_domain_from_blob(blob: str, default: str) -> str:
+    b = blob.lower()
+    if any(k in b for k in ("jollof", "suya", "amala", "restaurant", "buka", "food", "meal", "pizza")):
+        return "food"
+    if any(k in b for k in ("movie", "film", "nollywood", "cinema", "soundtrack", "dvd")):
+        return "movies"
+    if any(k in b for k in ("book", "novel", "chapter", "author")):
+        return "books"
+    if any(k in b for k in ("earbud", "keyboard", "laptop", "phone", "usb", "battery", "router")):
+        return "tech"
+    if any(k in b for k in ("spa", "yoga", "wellness")):
+        return "wellness"
+    return default
+
+
+def _polish_record(rec: NormalizedReviewRecord) -> NormalizedReviewRecord:
+    from core.recommendation_items import infer_title_from_text
+
+    name = (rec.item_name or "").strip()
+    text = (rec.text or "").strip()
+    domain = rec.item_domain
+
+    if name.lower() in _PLACEHOLDER_NAMES or len(name) < 4:
+        inferred = infer_title_from_text(text)
+        if inferred:
+            name, domain = inferred[0], inferred[1]
+        elif rec.source == "yelp":
+            name = "Local Restaurant Pick"
+            domain = "food"
+        elif rec.source == "amazon":
+            name = "Amazon Product Pick"
+            domain = "tech"
+
+    if rec.source == "amazon" and name.lower() in _GENERIC_AMAZON_TITLES:
+        inferred = infer_title_from_text(text)
+        if inferred:
+            name, domain = inferred[0], inferred[1]
+
+    if rec.source == "amazon":
+        domain = _infer_domain_from_blob(f"{name} {text}", rec.item_domain or "tech")
+    elif rec.source == "yelp" and domain in ("general", "restaurant"):
+        domain = _infer_domain_from_blob(f"{name} {text}", "food")
+
+    if len(name) > 100:
+        name = name[:97] + "..."
+
+    return rec.model_copy(update={"item_name": name, "item_domain": domain, "text": text})
+
+
+def _load_from_large_corpus(
+    path: Path,
+    *,
+    max_per_source: int = 400,
+) -> List[NormalizedReviewRecord]:
+    """Import seed rows from scripts/generate_corpus.py output (no HuggingFace)."""
+    if not path.is_file():
+        print(f"Large corpus not found, skipping: {path}")
+        return []
+    data = json.loads(path.read_text(encoding="utf-8"))
+    raw_rows: List[Dict[str, Any]]
+    if isinstance(data, list):
+        raw_rows = data
+    elif isinstance(data, dict) and isinstance(data.get("records"), list):
+        raw_rows = data["records"]
+    else:
+        print(f"Unrecognized large corpus shape: {path}")
+        return []
+
+    per_source: Dict[str, int] = {}
+    out: List[NormalizedReviewRecord] = []
+    for row in raw_rows:
+        source = str(row.get("source", "corpus"))
+        if per_source.get(source, 0) >= max_per_source:
+            continue
+        try:
+            rec = NormalizedReviewRecord(
+                source=source,
+                user_id=str(row.get("user_id", "unknown")),
+                item_id=str(row.get("item_id", "unknown")),
+                item_name=str(row.get("item_name", "item")),
+                item_domain=str(row.get("item_domain", "general")),
+                text=str(row.get("text", "")).strip(),
+                rating=float(row.get("rating", 3.5)),
+            )
+        except Exception:
+            continue
+        if len(rec.text) < 20:
+            continue
+        out.append(rec)
+        per_source[source] = per_source.get(source, 0) + 1
+
+    print(f"Imported {len(out)} rows from {path} — {per_source}")
+    return out
 
 
 def _load_extra_jsonl(path: Path) -> List[NormalizedReviewRecord]:
@@ -157,7 +328,10 @@ def _coerce_amazon_hf_row(row: Dict[str, Any], idx: int) -> Dict[str, Any]:
         r["rating"] = 5.0 if int(r["label"]) == 1 else 1.0
     r.setdefault("user_id", f"hf_amazon_{idx}")
     r.setdefault("asin", f"hf_amazon_{idx}")
-    r.setdefault("title", str(r.get("title", "amazon_review")))
+    title = str(r.get("title", "")).strip()
+    if not title or title.lower() in _PLACEHOLDER_NAMES or len(title) < 3:
+        title = "amazon_review"
+    r["title"] = title
     r.setdefault("category", "general")
     return r
 
@@ -184,8 +358,11 @@ def _fetch_hf_records(limit: int, hf_sources: set[str]) -> List[NormalizedReview
             for idx, row in enumerate(_hf_stream_rows(dataset_name, split, limit)):
                 try:
                     rec = normalizer(coerce(dict(row), idx))
-                    if rec.text:
-                        out.append(rec)
+                    if not rec.text or len(rec.text) < 40:
+                        continue
+                    if key == "amazon" and rec.item_name.lower() in _GENERIC_AMAZON_TITLES:
+                        continue
+                    out.append(rec)
                 except Exception:
                     continue
             print(f"Ingested {dataset_name}: {len(out) - n_before} records (streaming).")

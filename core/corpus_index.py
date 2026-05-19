@@ -178,6 +178,7 @@ class LargeCorpusIndex:
         limit: int = 30,
         cold_start: bool = False,
         cross_domain: bool = False,
+        team_culture_mode: bool = False,
     ) -> List[Tuple[CatalogItem, float]]:
         """Stage-1 pool for Task B with persona constraint filtering."""
         tier = infer_price_tier_constraint(
@@ -188,6 +189,17 @@ class LargeCorpusIndex:
         )
         interest_terms = _terms(" ".join(interests))
         query_terms = interest_terms | _terms(context or "", location or "")
+
+        def _team_culture_boost(item: CatalogItem, score: float) -> float:
+            dom = (item.domain or "").lower()
+            if dom in ("food", "experiences", "entertainment", "drinks", "books"):
+                score += 0.35
+            if dom == "tech":
+                score -= 0.45
+            title_l = item.title.lower()
+            if any(k in title_l for k in ("earbud", "keyboard", "power bank", "mifi", "router", "usb")):
+                score -= 0.25
+            return score
 
         def _run() -> List[Tuple[CatalogItem, float]]:
             # Always seed with curated product catalog (real item titles).
@@ -224,9 +236,23 @@ class LargeCorpusIndex:
                     adj += 0.2
                 if "budget" in item.tags or "student" in item.tags:
                     adj += 0.1
+                if team_culture_mode:
+                    adj = _team_culture_boost(item, adj)
                 scored.append((item, round(adj, 4)))
 
-            return merge_unique_items(scored, limit=limit)
+            merged = merge_unique_items(scored, limit=limit)
+            if team_culture_mode:
+                tech_cap = 1
+                tech_seen = 0
+                filtered: List[Tuple[CatalogItem, float]] = []
+                for item, sc in merged:
+                    if (item.domain or "").lower() == "tech":
+                        if tech_seen >= tech_cap:
+                            continue
+                        tech_seen += 1
+                    filtered.append((item, sc))
+                return filtered[:limit]
+            return merged
 
         fallback = [
             (c, 0.5 - i * 0.01) for i, c in enumerate(curated_catalog_items()[:limit])

@@ -342,19 +342,28 @@ The frontend parses these line-by-line and animates the reasoning timeline in re
 
 ## Datasets
 
-The retrieval corpus at `data/processed/review_corpus.jsonl` represents **all three datasets named in the brief** (Yelp, Amazon, Goodreads). Build/rebuild with:
+**Stage-1 large corpus (3,000 rows)** — generated locally for Task B retrieval:
 
 ```bash
-# HuggingFace path (recommended; needs internet)
+python scripts/generate_corpus.py --build-index
+```
+
+Writes `data/large_corpus.json` (1,000 Yelp + 1,000 Amazon + 1,000 Goodreads) with rich `domain_record` metadata and builds `data/processed/corpus_index.json`. Default `LARGE_CORPUS_PATH=data/large_corpus.json`.
+
+The smaller seed corpus at `data/processed/review_corpus.jsonl` represents **all three datasets named in the brief** (Yelp, Amazon, Goodreads). Build/rebuild with:
+
+```bash
+# Offline seed corpus (recommended when HuggingFace parquet downloads time out)
+python scripts/generate_corpus.py --build-index
+python scripts/build_review_corpus.py --offline-only \
+  --from-large-corpus data/large_corpus.json \
+  --extra_jsonl data/offline_review_samples.jsonl
+
+# HuggingFace path (needs stable internet; yelp_review_full parquet is large)
 python scripts/build_review_corpus.py \
   --output data/processed/review_corpus.jsonl \
   --extra_jsonl data/offline_review_samples.jsonl \
-  --use_hf --hf_sources yelp,amazon --limit 250
-
-# Fully offline path (uses curated seed only — useful for reproducibility)
-python scripts/build_review_corpus.py \
-  --output data/processed/review_corpus.jsonl \
-  --extra_jsonl data/offline_review_samples.jsonl
+  --use_hf --hf_sources amazon --limit 500
 ```
 
 A Kaggle path is also supported (`--use_kaggle` with API token, or `--kaggle_*_dir` for a manual unzipped download). See `scripts/build_review_corpus.py --help`.
