@@ -13,9 +13,11 @@ class Settings(BaseSettings):
     default_persona_style: str = "formal"
     max_history_items: int = 30
     model_name: str = "gpt-4o-mini"
+    # Single committed corpus for Task A few-shots, Task B stage-1, and unified history.
     review_corpus_path: str = "data/processed/review_corpus.jsonl"
-    large_corpus_path: str = "data/large_corpus.json"
     corpus_index_path: str = "data/processed/corpus_index.json"
+    # Alias kept for health checks / legacy env; always points at review_corpus_path.
+    large_corpus_path: str = "data/processed/review_corpus.jsonl"
     corpus_query_timeout_sec: float = 2.5
     # When true, uvicorn startup builds large_corpus if missing (Docker uses entrypoint instead).
     corpus_build_on_startup: bool = True

@@ -21,14 +21,13 @@ DEFAULT_QUERY_TIMEOUT_SEC = 2.5
 
 
 def corpus_paths() -> List[Path]:
-    """Ordered preference: large corpus → processed review corpus."""
+    """Ordered preference: committed review corpus (5k+) → legacy fallbacks."""
     candidates = [
-        Path(settings.large_corpus_path),
+        Path(settings.review_corpus_path),
+        Path("data/processed/review_corpus.jsonl"),
         Path("data/large_corpus.jsonl"),
         Path("data/large_corpus.json"),
         Path("data/large_corpus.parquet"),
-        Path(settings.review_corpus_path),
-        Path("data/processed/review_corpus.jsonl"),
     ]
     seen: set[str] = set()
     ordered: List[Path] = []

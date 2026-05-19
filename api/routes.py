@@ -25,9 +25,11 @@ def healthcheck() -> dict:
         "status": "ok",
         "service": "naijasense-ai",
         "corpus": {
-            "large_corpus_ready": corpus_is_ready(),
-            "large_corpus_path": settings.large_corpus_path,
+            "corpus_ready": corpus_is_ready(),
+            "review_corpus_path": settings.review_corpus_path,
             "corpus_index_path": settings.corpus_index_path,
+            "large_corpus_ready": corpus_is_ready(),
+            "large_corpus_path": settings.review_corpus_path,
         },
     }
 

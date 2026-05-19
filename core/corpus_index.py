@@ -121,7 +121,7 @@ class LargeCorpusIndex:
         corpus_path: str | None = None,
         index_path: str | None = None,
     ) -> None:
-        self.corpus_path = Path(corpus_path or settings.large_corpus_path)
+        self.corpus_path = Path(corpus_path or settings.review_corpus_path)
         self.index_path = Path(index_path or settings.corpus_index_path)
         self._postings: Dict[str, List[int]] | None = None
         self._indexed_rows: List[Dict[str, Any]] | None = None
@@ -217,7 +217,7 @@ class LargeCorpusIndex:
             hits = self._retrieve_rows(
                 query_terms=query_terms,
                 domain_terms=interest_terms,
-                limit=limit * 4,
+                limit=min(limit * 8, 500),
                 rating_hint=None,
                 unique_items=True,
                 tier_filter=tier,

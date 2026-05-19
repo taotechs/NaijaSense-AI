@@ -14,8 +14,8 @@ RUN python -m pip install --no-cache-dir --upgrade pip && \
 
 COPY . .
 
-# Bake 3k-row structured corpus + inverted index into the image.
-RUN python scripts/generate_corpus.py --build-index
+# Index full review_corpus.jsonl (5k+ rows) for Task A + Task B retrieval.
+RUN python scripts/build_corpus_index.py
 
 RUN chmod +x scripts/docker-entrypoint.sh
 

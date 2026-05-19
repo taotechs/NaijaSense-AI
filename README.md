@@ -29,7 +29,7 @@ Stack: Groq **Llama 3.1 8B** (router) + **Llama 3.3 70B** (generator). Set `GROQ
 
 **Task A** — Two-pass agent: infer domain → lock rating + rationale → write review text aligned to that score.
 
-**Task B** — Persona-only pipeline: retrieve top-30 candidates from a 3k-row corpus → diversify by domain → router ranks items → generator writes one grounded paragraph.
+**Task B** — Persona-only pipeline: retrieve top-30 candidates from the **5k-row** shared corpus index → diversify by domain → router ranks items → generator writes one grounded paragraph.
 
 **Unified hub** (`/unified`) — Optional demo: intent routing, streaming traces, silent history, critique loop. Not used on the hackathon submission routes.
 
@@ -93,28 +93,22 @@ Other routes (`/api/v1/*`, `/api/agent/v1`, streaming) are documented in Swagger
 
 ## Data & corpus
 
-| Corpus | Path | Size |
-|--------|------|-----:|
-| Seed / few-shots / history | `data/processed/review_corpus.jsonl` | **5,011** (Yelp 2,498 · Amazon 2,482 · Goodreads 31) |
-| Task B stage-1 retrieval | `data/large_corpus.json` | **3,000** (1k per domain; built at deploy) |
+**One corpus for Task A and Task B:** `data/processed/review_corpus.jsonl` (**5,011** rows — Yelp 2,498 · Amazon 2,482 · Goodreads 31).
 
-**Regenerate Task B index (deploy / local):**
+Task A uses it for few-shot retrieval; Task B uses the same file via `data/processed/corpus_index.json` (built at deploy / locally).
+
+**Build or refresh the index:**
 
 ```bash
-python scripts/generate_corpus.py --build-index
+python scripts/build_corpus_index.py
 ```
 
-**Rebuild seed JSONL** (offline or Hugging Face):
+**Rebuild review_corpus.jsonl** (optional — Hugging Face or offline):
 
 ```bash
-# Offline
-python scripts/build_review_corpus.py --offline-only \
-  --from-large-corpus data/large_corpus.json \
-  --extra_jsonl data/offline_review_samples.jsonl
-
-# Hugging Face (Yelp + Amazon streaming; needs stable network)
 python scripts/build_review_corpus.py --use_hf --hf_sources yelp,amazon \
   --limit 2500 --extra_jsonl data/offline_review_samples.jsonl
+python scripts/build_corpus_index.py --force
 ```
 
 ---

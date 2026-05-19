@@ -48,8 +48,8 @@ def main() -> None:
     parser.add_argument(
         "--large-corpus-per-source",
         type=int,
-        default=400,
-        help="Max rows per source when using --from-large-corpus.",
+        default=10_000,
+        help="Max rows per source when using --from-large-corpus (default: no practical cap).",
     )
     parser.add_argument(
         "--extra_jsonl",
